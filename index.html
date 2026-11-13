@@ -306,6 +306,8 @@ html, body { touch-action: manipulation; }
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
+  // Versión de los datos: evita que el navegador use una copia antigua de los .txt tras una actualización
+  var VDATOS = '42';
   var fmt = new Intl.NumberFormat('es-ES', { useGrouping: 'always' });
   var fmt1 = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
   var css = function (name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); };
@@ -355,7 +357,7 @@ html, body { touch-action: manipulation; }
   // ---------- Buscador: todas las calles y portales del callejero del Catastro ----------
   // direcciones.txt: nombres de calle, «####», y una línea por portal → nº calle|número|ref. catastral|lon|lat|CP
   var S = [], SN = [], SP = [], P = [];
-  var cargarDir = function () { return fetch('direcciones.txt').then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (t) {
+  var cargarDir = function () { return fetch('direcciones.txt?v=' + VDATOS).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (t) {
     var partes = t.split('\n####\n');
     S = partes[0].split('\n'); SN = S.map(norm); SP = S.map(function () { return []; });
     partes[1].split('\n').forEach(function (l) {
@@ -453,7 +455,7 @@ html, body { touch-action: manipulation; }
       var p = L[k].split('|'); if (p.length < 8) continue;
       var i = E.u.length, partes = [], sx = 0, sy = 0, sn = 0;
       p[7].split('#').forEach(function (gr) {
-        var at = gr.indexOf('@'), pl = +gr.slice(0, at), polys = [];
+        var at = gr.indexOf('@'), pl = at < 0 ? (+p[4] || 1) : +gr.slice(0, at), polys = [];
         gr.slice(at + 1).split(';').forEach(function (pg) {
         if (!pg) return;
         polys.push(pg.split('/').map(function (r) {
@@ -491,8 +493,8 @@ html, body { touch-action: manipulation; }
       (VB[v.rc] = VB[v.rc] || []).push(v);
     });
   }
-  var vutCargado = fetch('vut.txt').then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(leerVut).catch(function () {});
-  var datos = vutCargado.then(function () { return fetch('edificios.txt'); }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+  var vutCargado = fetch('vut.txt?v=' + VDATOS).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(leerVut).catch(function () {});
+  var datos = vutCargado.then(function () { return fetch('edificios.txt?v=' + VDATOS); }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
     .then(function (t) {
       var gj = leer(t); GJ = gj;
       // VUT cuyo edificio no ha salido en el Catastro aligerado: sin coordenadas, no se pueden situar
@@ -624,7 +626,7 @@ html, body { touch-action: manipulation; }
     { n: 'Alojamiento rural', f: function (a) { return a.tipo === 'Casa rural' || a.tipo === 'Vivienda turística de alojamiento rural'; } },
     { n: 'Áreas de autocaravanas', sinPlazas: true, f: function (a) { return a.tipo === 'Campamento de turismo'; } }
   ];
-  var alCargado = fetch('alojamientos.txt').then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (t) {
+  var alCargado = fetch('alojamientos.txt?v=' + VDATOS).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (t) {
     t.split('\n').forEach(function (l) {
       var q = l.split('|'); if (q.length < 14) return;
       var a = { rc: q[0], lon: +q[1], lat: +q[2], tipo: q[3], grupo: q[4], cat: q[5], mod: q[6], reg: q[7], f: q[8], nom: q[9], dir: q[10], cp: q[11], plz: +q[12] || 0, ua: +q[13] || 0 };
