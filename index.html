@@ -155,6 +155,7 @@ html, body { touch-action: manipulation; }
 .anios button { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; padding: 0; border: 0; background: none; cursor: pointer; }
 .anios .b { display: block; background: color-mix(in srgb, var(--accent) 45%, var(--panel)); border-radius: 4px 4px 0 0; min-height: 2px; }
 .anios button:hover .b, .anios button[aria-pressed="true"] .b { background: var(--accent); }
+.aniosW .ejeAnio { display: block; font-size: 12.5px; font-weight: 600; margin-top: 4px; }
 .aniosW small { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; }
 .anios.hay-sel button[aria-pressed="false"] .b { opacity: .45; }
 .anios.densa { gap: 1px; }
@@ -281,7 +282,7 @@ html, body { touch-action: manipulation; }
       <div class="sec"><h2>Viviendas turísticas</h2><div class="ver" id="verVut" role="group" aria-label="Viviendas turísticas en el mapa"><button type="button" data-on="1" aria-pressed="true">Activar</button><button type="button" data-on="0" aria-pressed="false">Desactivar</button></div></div>
       <div class="sub" id="vutSub"></div>
       <div id="filtroAnio" class="filtroAnio"><span id="anioLbl" class="anioLbl">¿Cuándo se registró?</span><details id="anioDd" class="anioDd"><summary id="anioSum" class="anioSum" aria-labelledby="anioLbl anioSum">Todos los años</summary><div id="anioLista" class="anioLista" role="group" aria-labelledby="anioLbl"></div></details></div>
-      <div id="aniosW" class="aniosW"><div id="anios" class="anios" role="group" aria-label="Viviendas turísticas inscritas cada año. Pulsa un año para verlo en el mapa"></div><small>Viviendas inscritas cada año que siguen hoy en el registro. Pulsa una o varias barras para verlas en el mapa.</small></div>
+      <div id="aniosW" class="aniosW"><div id="anios" class="anios" role="group" aria-label="Viviendas turísticas inscritas cada año. Pulsa un año para verlo en el mapa"></div><span class="ejeAnio" aria-hidden="true">Año</span><small>Viviendas inscritas cada año que siguen hoy en el registro. Pulsa una o varias barras para verlas en el mapa.</small></div>
       <div class="esc" aria-label="Viviendas turísticas inscritas por edificio">
         <span>Por edificio:</span><span><i style="--c:var(--vt-1)"></i>1</span><span><i style="--c:var(--vt-2)"></i>2–4</span><span><i style="--c:var(--vt-3)"></i>5–19</span><span><i style="--c:var(--vt-4)"></i>20 o más</span><span><i style="--c:var(--vt-0)"></i>Ninguna</span>
       </div>
@@ -291,7 +292,7 @@ html, body { touch-action: manipulation; }
       <div class="sec"><h2>Hoteles, hostales y similares</h2><div class="ver" id="verAl" role="group" aria-label="Hoteles, hostales y similares en el mapa"><button type="button" data-on="1" aria-pressed="true">Activar</button><button type="button" data-on="0" aria-pressed="false">Desactivar</button></div></div>
       <div class="sub" id="alSub">Cargando el Registro de Turismo…</div>
       <div class="filtroAnio"><span id="anioLbl2" class="anioLbl">¿Cuándo se registró?</span><details id="anioDd2" class="anioDd"><summary id="anioSum2" class="anioSum" aria-labelledby="anioLbl2 anioSum2">Todos los años</summary><div id="anioLista2" class="anioLista" role="group" aria-labelledby="anioLbl2"></div></details></div>
-      <div class="aniosW"><div id="anios2" class="anios" role="group" aria-label="Establecimientos inscritos cada año. Pulsa un año para verlo en el mapa"></div><small>Establecimientos inscritos cada año que siguen hoy en el registro; la primera barra reúne los inscritos antes de 2000. Pulsa una o varias barras para verlos en el mapa.</small></div>
+      <div class="aniosW"><div id="anios2" class="anios" role="group" aria-label="Establecimientos inscritos cada año. Pulsa un año para verlo en el mapa"></div><span class="ejeAnio" aria-hidden="true">Año</span><small>Establecimientos inscritos cada año que siguen hoy en el registro; la primera barra reúne los inscritos antes de 2000. Pulsa una o varias barras para verlos en el mapa.</small></div>
       <table id="alTipos" aria-label="Establecimientos y plazas por tipo"></table>
       <div class="esc" aria-label="Leyenda de hoteles, hostales y similares">
         <span><i style="--c:var(--al)"></i>Edificio con hotel, hostal o similar</span><span><i class="rayas"></i>Y además viviendas turísticas</span><span><i class="circ" style="--d:10px"></i>Dentro de un gran complejo (centro comercial, estación) o sin edificio en el Catastro (tamaño según plazas)</span>
