@@ -174,7 +174,7 @@ h1 em { font-style: normal; color: var(--accent); }
 .franja svg { width: 22px; height: 22px; }
 .franja:hover { filter: brightness(1.12); }
 #mini, #abrir { background: var(--accent); border-color: var(--accent); }
-#mini { flex: none; margin: -2px -18px -12px; width: calc(100% + 36px); border: 0; border-radius: 0 0 13px 13px; position: sticky; bottom: -12px; }
+#mini { flex: none; margin: -2px -18px -12px; width: calc(100% + 36px); border: 0; border-radius: 0 0 13px 13px; position: sticky; bottom: -12px; z-index: 2; }
 #abrir { position: absolute; z-index: 3; border: 1px solid var(--accent); box-shadow: var(--shadow); top: calc(14px + env(safe-area-inset-top, 0px)); left: max(14px, env(safe-area-inset-left, 0px)); width: 368px; border-radius: 12px; }
 #abrir svg { transform: rotate(180deg); }
 #app:not(.mini) #abrir, #app.mini #panel { display: none; }
@@ -242,7 +242,7 @@ h1 em { font-style: normal; color: var(--accent); }
   #layers { grid-template-columns: repeat(2, 1fr); gap: 5px; }
   .layer { padding: 7px 8px; }
   .layer .big { font-size: 16px; }
-  #mini { order: -1; position: static; margin: -13px -14px -4px; width: calc(100% + 28px); border-radius: 13px 13px 0 0; height: 24px; }
+  #mini { order: -1; position: sticky; top: -13px; bottom: auto; margin: -13px -14px -4px; width: calc(100% + 28px); border-radius: 13px 13px 0 0; height: 24px; }
   #mini svg { transform: rotate(180deg); }
   #abrir { top: auto; bottom: calc(32px + env(safe-area-inset-bottom, 0px)); left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); width: auto; height: 30px; }
   #abrir svg { transform: none; }
