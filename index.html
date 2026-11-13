@@ -148,6 +148,12 @@ html, body { touch-action: manipulation; }
 .anios button:hover .b, .anios button[aria-pressed="true"] .b { background: var(--accent); }
 .aniosW small { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; }
 .anios.hay-sel button[aria-pressed="false"] .b { opacity: .45; }
+.anios.densa { gap: 1px; }
+.anios button { min-width: 0; }
+.anios button.antes { grid-column: span 5; }
+.anios button.antes .b { margin: 0 30%; }
+.anios button.antes .y { white-space: nowrap; }
+.anios.densa .y { font-size: 8px; letter-spacing: -.4px; }
 .anios .y { font-size: 10px; color: var(--muted); text-align: center; margin-top: 3px; font-variant-numeric: tabular-nums; }
 .anios .c { text-align: center; margin-bottom: 2px; font-size: 10px; font-weight: 700; color: var(--ink); white-space: nowrap; visibility: hidden; font-variant-numeric: tabular-nums; }
 .anios button:hover .c, .anios button[aria-pressed="true"] .c, .anios button.max .c { visibility: visible; }
@@ -509,16 +515,19 @@ html, body { touch-action: manipulation; }
     F.pintar = function () {
       var c = {}, pl = {}; o.items().forEach(function (it) { var k = clave(it.f); if (k) { c[k] = (c[k] || 0) + 1; pl[k] = (pl[k] || 0) + it.p; } });
       var ks = Object.keys(c).sort(orden); if (!ks.length) return;
+      // Todos los años del intervalo, también los que no tienen inscripciones
+      var ys = ks.filter(function (k) { return k !== 'antes'; }).map(Number);
+      if (ys.length) for (var y = Math.min.apply(null, ys); y <= Math.max.apply(null, ys); y++) if (!c[y]) { c[y] = 0; pl[y] = 0; }
+      ks = Object.keys(c).sort(orden);
       var max = Math.max.apply(null, ks.map(function (k) { return c[k]; }));
       var nom = function (k) { return k === 'antes' ? 'Antes de ' + o.antes : k; };
-      $(o.id + 'Lista' + o.suf).innerHTML = '<button type="button" class="todos">Todos los años</button>' + ks.slice().reverse().map(function (k) {
+      $(o.id + 'Lista' + o.suf).innerHTML = '<button type="button" class="todos">Todos los años</button>' + ks.slice().reverse().filter(function (k) { return c[k]; }).map(function (k) {
         return '<label><input type="checkbox" value="' + k + '"' + (F.sel[k] ? ' checked' : '') + '>' + nom(k) + '<small>' + fmt.format(c[k]) + '</small></label>'; }).join('');
       $(o.id + 'Sum' + o.suf).textContent = o.activa && !o.activa() ? 'Sección desactivada' : F.texto ? F.texto.charAt(0).toUpperCase() + F.texto.slice(1) : 'Todos los años';
-      var B = $(o.id + 's' + o.suf); B.className = 'anios' + (F.texto ? ' hay-sel' : '');
+      var B = $(o.id + 's' + o.suf); B.className = 'anios' + (F.texto ? ' hay-sel' : '') + (ks.length > 16 ? ' densa' : '');
       B.innerHTML = ks.map(function (k) {
-        var h = c[k] / max * 100, et = k === 'antes' ? '<' + String(o.antes).slice(2) : "'" + k.slice(2);
-        var verEt = !o.cadaEtiqueta || k === 'antes' || +k % o.cadaEtiqueta === 0;
-        return '<button type="button" data-y="' + k + '" aria-pressed="' + !!F.sel[k] + '"' + (c[k] === max ? ' class="max"' : '') + ' title="' + nom(k) + ': ' + fmt.format(c[k]) + ' ' + o.unidad + ', ' + fmt.format(pl[k]) + ' plazas">' +
+        var h = c[k] / max * 100, et = k === 'antes' ? 'anterior al ' + String(o.antes).slice(2) : k.slice(2), verEt = true;
+        return '<button type="button" data-y="' + k + '" aria-pressed="' + !!F.sel[k] + '"' + (c[k] === max || k === 'antes' ? ' class="' + (c[k] === max ? 'max ' : '') + (k === 'antes' ? 'antes' : '') + '"' : '') + ' title="' + nom(k) + ': ' + fmt.format(c[k]) + ' ' + o.unidad + ', ' + fmt.format(pl[k]) + ' plazas">' +
           '<span class="c">' + fmt.format(c[k]) + '</span><span class="b" style="height:' + (h * 0.62) + '%"></span><span class="y">' + (verEt ? et : '&nbsp;') + '</span></button>';
       }).join('');
     };
