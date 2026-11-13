@@ -434,16 +434,18 @@ html, body { touch-action: manipulation; }
 
   // ---------- Datos ----------
   // edificios.txt: una línea por edificio → uso|refcat|año|m²|plantas|estado|viviendas|geometría
-  // Geometría: polígonos separados por «;», anillos por «/», coordenadas en unidades de 2 millonésimas de grado codificadas como diferencias.
+  // Geometría: grupos de partes «plantas@polígonos» separados por «#»; polígonos separados por «;», anillos por «/», coordenadas en unidades de 2 millonésimas de grado codificadas como diferencias.
   // (año, m² y estado van vacíos: el mapa no los usa y así pesa menos)
   function leer(txt) {
-    var L = txt.split('\n'), feats = [];
+    var L = txt.split('\n'), feats = []; FI = [];
     E = { u: [], r: [], v: [] };
     E.cx = new Float64Array(L.length); E.cy = new Float64Array(L.length);
     for (var k = 0; k < L.length; k++) {
       var p = L[k].split('|'); if (p.length < 8) continue;
-      var i = E.u.length, polys = [], sx = 0, sy = 0, sn = 0;
-      p[7].split(';').forEach(function (pg) {
+      var i = E.u.length, partes = [], sx = 0, sy = 0, sn = 0;
+      p[7].split('#').forEach(function (gr) {
+        var at = gr.indexOf('@'), pl = +gr.slice(0, at), polys = [];
+        gr.slice(at + 1).split(';').forEach(function (pg) {
         if (!pg) return;
         polys.push(pg.split('/').map(function (r) {
           var d = r.split(','), x = 0, y = 0, out = [];
@@ -451,16 +453,22 @@ html, body { touch-action: manipulation; }
           if (out.length && (out[0][0] !== out[out.length - 1][0] || out[0][1] !== out[out.length - 1][1])) out.push(out[0]);
           return out;
         }).filter(function (r) { return r.length >= 4; }));
+        });
+        polys = polys.filter(function (pg) { return pg.length; });
+        if (polys.length) partes.push({ pl: pl, polys: polys });
       });
-      polys = polys.filter(function (pg) { return pg.length; });
-      if (!polys.length) continue;
-      polys[0][0].forEach(function (c) { sx += c[0]; sy += c[1]; sn++; });
+      if (!partes.length) continue;
+      partes[0].polys[0][0].forEach(function (c) { sx += c[0]; sy += c[1]; sn++; });
       E.u.push(USO[p[0]] ? p[0] : 'x'); E.r.push(p[1]); E.v.push(+p[6] || 0);
       E.cx[i] = sx / sn; E.cy[i] = sy / sn; ERC[p[1]] = i;
-      var alt = Math.max(1, Math.min(40, +p[4] || 1)) * 3.2;
       var nv = VB[p[1]] ? VB[p[1]].length : 0;
       if (nv) { VB[p[1]].forEach(function (v) { v.ed = i; if (isNaN(v.lon) || v.lon == null) { v.lon = E.cx[i]; v.lat = E.cy[i]; } }); VED++; }
-      feats.push({ type: 'Feature', id: i, properties: { u: E.u[i], h: alt, t: nv }, geometry: { type: 'MultiPolygon', coordinates: polys } });
+      // Una figura por cada grupo de partes con el mismo nº de plantas sobre rasante (Catastro, BuildingPart), todas con el id del edificio
+      FI[i] = [];
+      partes.forEach(function (pt) {
+        FI[i].push(feats.length);
+        feats.push({ type: 'Feature', id: i, properties: { h: Math.max(1, pt.pl) * 3.2, t: nv }, geometry: { type: 'MultiPolygon', coordinates: pt.polys } });
+      });
     }
     return { type: 'FeatureCollection', features: feats };
   }
@@ -546,7 +554,7 @@ html, body { touch-action: manipulation; }
   }
   // Colorea cada edificio según lo que tenga inscrito con los años elegidos: viviendas turísticas (rosa),
   // hoteles y similares (azul) o ambos (rayas de los dos colores, en una capa aparte).
-  var GJ = null;
+  var GJ = null, FI = []; // FI[i]: posiciones en GJ.features de las partes del edificio i
   var VACIO = { type: 'FeatureCollection', features: [] };
   var nivel = function (n) { return n >= 20 ? 4 : n >= 5 ? 3 : n >= 2 ? 2 : 1; };
   // Establecimiento dentro de un gran complejo: si el complejo tiene también viviendas turísticas, el edificio va a rayas;
@@ -560,7 +568,7 @@ html, body { touch-action: manipulation; }
       var i = ERC[rc]; if (i == null) return;
       var t = VER_V ? deAnio(rc).length : 0, a = VER_A ? deAnio2(rc).length + (t ? parteVisible(rc) : 0) : 0;
       map.setFeatureState({ source: 'catastro', id: i }, { t: t, a: a });
-      if (t && a) { ids.push(i); var g = GJ.features[i]; mix.push({ type: 'Feature', id: i, properties: { h: g.properties.h, lvl: nivel(t) }, geometry: g.geometry }); }
+      if (t && a) { ids.push(i); FI[i].forEach(function (k) { var g = GJ.features[k]; mix.push({ type: 'Feature', id: i, properties: { h: g.properties.h, lvl: nivel(t) }, geometry: g.geometry }); }); }
     });
     var f = ids.length ? ['!', ['in', ['id'], ['literal', ids]]] : null;
     map.setFilter('edificios', f);
