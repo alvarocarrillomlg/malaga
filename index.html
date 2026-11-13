@@ -74,8 +74,10 @@ h1 em { font-style: normal; color: var(--accent); }
 #zona button.sec2 { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); }
 #zona button:disabled { opacity: .45; cursor: default; }
 #zona b { color: var(--accent); }
-.maplibregl-ctrl-group button#zonaBtn { width: auto; height: 29px; padding: 0 10px; font: 600 12px/1 var(--font); color: #333; white-space: nowrap; }
-.maplibregl-ctrl-group button#zonaBtn[aria-pressed="true"] { background: var(--accent); color: var(--on-color); }
+.maplibregl-ctrl-group:has(#zonaBtn) { background: var(--accent); }
+.maplibregl-ctrl-group button#zonaBtn { width: auto; height: 38px; padding: 0 16px; border-radius: 4px; background: var(--accent); font: 700 14px/1 var(--font); color: #fff; white-space: nowrap; }
+.maplibregl-ctrl-group button#zonaBtn:hover { background: color-mix(in srgb, var(--accent) 85%, #000); }
+.maplibregl-ctrl-group button#zonaBtn[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 80%, #000); color: #fff; }
 #enCalle[hidden], #zona[hidden] { display: none !important; }
 #enCalle span, #zona span { flex: 1; min-width: 0; line-height: 1.35; }
 #enCalle button, #zona button { flex: none; height: 28px; padding: 0 11px; border: 0; border-radius: 99px; background: var(--accent); color: var(--on-color); font: 600 12.5px/1 var(--font); cursor: pointer; }
