@@ -262,7 +262,7 @@ h1 em { font-style: normal; color: var(--accent); }
     <ul id="vres" aria-label="Resultados"></ul>
 
     <div id="vut">
-      <div class="sec"><h2>Viviendas turísticas</h2><button type="button" class="ver" id="verVut" aria-label="Ocultar las viviendas turísticas en el mapa">Ocultar</button></div>
+      <div class="sec"><h2>Viviendas turísticas</h2><button type="button" class="ver" id="verVut" aria-label="Desactivar las viviendas turísticas en el mapa">Desactivar</button></div>
       <div class="sub" id="vutSub"></div>
       <div id="filtroAnio" class="filtroAnio"><span id="anioLbl" class="anioLbl">Año</span><details id="anioDd" class="anioDd"><summary id="anioSum" class="anioSum" aria-labelledby="anioLbl anioSum">Todos los años</summary><div id="anioLista" class="anioLista" role="group" aria-labelledby="anioLbl"></div></details></div>
       <div id="aniosW" class="aniosW"><div id="anios" class="anios" role="group" aria-label="Viviendas turísticas inscritas cada año. Pulsa un año para verlo en el mapa"></div><small>Viviendas inscritas cada año que siguen hoy en el registro. Pulsa una o varias barras para verlas en el mapa.</small></div>
@@ -272,7 +272,7 @@ h1 em { font-style: normal; color: var(--accent); }
     </div>
 
     <div id="aloj">
-      <div class="sec"><h2>Hoteles, hostales y similares</h2><button type="button" class="ver" id="verAl" aria-label="Ocultar los hoteles, hostales y similares en el mapa">Ocultar</button></div>
+      <div class="sec"><h2>Hoteles, hostales y similares</h2><button type="button" class="ver" id="verAl" aria-label="Desactivar los hoteles, hostales y similares en el mapa">Desactivar</button></div>
       <div class="sub" id="alSub">Cargando el Registro de Turismo…</div>
       <div class="filtroAnio"><span id="anioLbl2" class="anioLbl">Año</span><details id="anioDd2" class="anioDd"><summary id="anioSum2" class="anioSum" aria-labelledby="anioLbl2 anioSum2">Todos los años</summary><div id="anioLista2" class="anioLista" role="group" aria-labelledby="anioLbl2"></div></details></div>
       <div class="aniosW"><div id="anios2" class="anios" role="group" aria-label="Establecimientos inscritos cada año. Pulsa un año para verlo en el mapa"></div><small>Establecimientos inscritos cada año que siguen hoy en el registro; la primera barra reúne los inscritos antes de 2000. Pulsa una o varias barras para verlos en el mapa.</small></div>
@@ -608,8 +608,12 @@ h1 em { font-style: normal; color: var(--accent); }
     if (a.tipo === 'Campamento de turismo') return a.grupo || 'Campamento de turismo';
     return a.grupo || a.tipo;
   }
+  var esHotel = function (a) { return /^Hotel/.test(a.grupo) && a.tipo === 'Establecimiento Hotelero'; };
+  var estrellas = function (a) { var m = /(\d)\s*Estrella/i.exec(a.cat); return m ? +m[1] : 0; };
   var GRUPOS = [
-    { n: 'Hoteles', f: function (a) { return /^Hotel/.test(a.grupo) && a.tipo === 'Establecimiento Hotelero'; } },
+    { n: 'Hoteles de 3 estrellas o menos', f: function (a) { return esHotel(a) && estrellas(a) <= 3; } },
+    { n: 'Hoteles de 4 estrellas', f: function (a) { return esHotel(a) && estrellas(a) === 4; } },
+    { n: 'Hoteles de 5 estrellas', f: function (a) { return esHotel(a) && estrellas(a) === 5; } },
     { n: 'Hostales y pensiones', f: function (a) { return a.grupo === 'Hostal' || a.grupo === 'Pensión'; } },
     { n: 'Edificios turísticos', f: function (a) { return a.tipo === 'Apartamento turístico'; } },
     { n: 'Albergues', f: function (a) { return a.grupo === 'Albergue'; } },
@@ -679,9 +683,12 @@ h1 em { font-style: normal; color: var(--accent); }
     if (popup) popup.remove();
     popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map);
   }
-  function botonVer(b, ver, que) { b.textContent = ver ? 'Ocultar' : 'Mostrar'; b.classList.toggle('oculto', !ver); b.setAttribute('aria-label', (ver ? 'Ocultar ' : 'Mostrar ') + que + ' en el mapa'); }
-  $('verVut').addEventListener('click', function () { VER_V = !VER_V; botonVer(this, VER_V, 'las viviendas turísticas'); if (popup) popup.remove(); repintar(); });
-  $('verAl').addEventListener('click', function () { VER_A = !VER_A; botonVer(this, VER_A, 'los hoteles, hostales y similares'); if (popup) popup.remove(); repintar(); });
+  function botonVer(b, ver, que) { b.textContent = ver ? 'Desactivar' : 'Activar'; b.classList.toggle('oculto', !ver); b.setAttribute('aria-label', (ver ? 'Desactivar ' : 'Activar ') + que + ' en el mapa'); }
+  // Al volver a activar una sección se activa todo lo suyo: todos los años y, en hoteles, todos los tipos.
+  $('verVut').addEventListener('click', function () { VER_V = !VER_V; botonVer(this, VER_V, 'las viviendas turísticas'); if (popup) popup.remove();
+    if (VER_V && FV.texto) FV.cambiar(null); else repintar(); });
+  $('verAl').addEventListener('click', function () { VER_A = !VER_A; botonVer(this, VER_A, 'los hoteles, hostales y similares'); if (popup) popup.remove();
+    if (VER_A) { TSEL = {}; if (FA.texto) FA.cambiar(null); else { FA.pintar(); aplicarAloj(); } } else repintar(); });
 
   // Viviendas cuyo edificio no aparece en el Catastro: se dibujan como puntos
   function puntosSueltos() {
@@ -740,7 +747,7 @@ h1 em { font-style: normal; color: var(--accent); }
     $('creditoSat').hidden = !si;
   }
 
-  var map, popup = null, en3D = false;
+  var map, popup = null, en3D = true;
   var VISTA = { center: [-4.44, 36.72], zoom: 12.4, pitch: 0, bearing: 0, pitch3D: 50, bearing3D: -12 };
   var colorUso = ['match', ['get', 'u']]; USOS.forEach(function (u) { colorUso.push(u.id, u.c); }); colorUso.push(css('--u-x'));
   function altura() { return en3D ? ['get', 'h'] : 0; }
@@ -756,7 +763,7 @@ h1 em { font-style: normal; color: var(--accent); }
 
   Promise.all([cargarEstilo(), datos.catch(function () { return null; }), alCargado]).then(function (res) {
     var estilo = res[0], gj = res[1];
-    map = new maplibregl.Map({ container: 'map', style: estilo, center: VISTA.center, zoom: VISTA.zoom, pitch: 0, bearing: 0,
+    map = new maplibregl.Map({ container: 'map', style: estilo, center: VISTA.center, zoom: VISTA.zoom, pitch: VISTA.pitch3D, bearing: VISTA.bearing3D,
       minZoom: es3D ? 9 : 11, maxZoom: es3D ? 19 : 16.5, maxPitch: 70,
       maxBounds: es3D ? [[-5.2, 36.4], [-3.9, 37.0]] : [[-4.66, 36.6], [-4.26, 36.84]],
       attributionControl: false,
@@ -786,7 +793,7 @@ h1 em { font-style: normal; color: var(--accent); }
         paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 15.5, 0.3, 18, 1.1], 'line-opacity': .8 } }, primeraSimbolo && primeraSimbolo.id);
       map.addSource('vutSueltas', { type: 'geojson', data: puntosSueltos() });
       map.addLayer({ id: 'vut-puntos', type: 'circle', source: 'vutSueltas', layout: { visibility: 'none' },
-        paint: { 'circle-color': css('--vt-3'), 'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2.5, 17, 6], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.2 } });
+        paint: { 'circle-color': css('--vt-3'), 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 9, 14, 7, 17, 4.5], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5 } });
       crearRayas();
       map.addSource('mixto', { type: 'geojson', data: VACIO });
       map.addLayer({ id: 'mixto', type: 'fill-extrusion', source: 'mixto',
@@ -797,7 +804,7 @@ h1 em { font-style: normal; color: var(--accent); }
       map.addSource('aloj', { type: 'geojson', data: puntosAloj() });
       map.addLayer({ id: 'aloj', type: 'circle', source: 'aloj',
         paint: { 'circle-color': css('--al'), 'circle-opacity': .85, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5,
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 2, 3.2, 3, 10, 5, 22.4, 9], 16, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 4, 3.2, 5, 10, 8, 22.4, 13]] } });
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 9, 10, 12, 22.4, 18], 14, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 7, 10, 9, 22.4, 13], 17, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 4.5, 10, 6, 22.4, 8]] } });
       map.on('click', 'aloj', function (e) { var f = e.features && e.features[0]; if (f) { e.preventDefault(); abrirAloj(f.properties.k, e.lngLat); } });
       map.on('mouseenter', 'aloj', function () { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'aloj', function () { map.getCanvas().style.cursor = ''; });
@@ -805,8 +812,10 @@ h1 em { font-style: normal; color: var(--accent); }
       map.on('mouseenter', 'vut-puntos', function () { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'vut-puntos', function () { map.getCanvas().style.cursor = ''; });
       pintarPanel(); pintarModo(); repintar();
-      map.on('click', 'edificios', function (e) { if (e.defaultPrevented) return; var f = e.features && e.features[0]; if (f) abrirFicha(f.id, e.lngLat); });
-      map.on('mouseenter', 'edificios', function () { map.getCanvas().style.cursor = 'pointer'; });
+      // Solo se pueden pulsar los edificios con algo inscrito (con los filtros y capas activos)
+      var tiene = function (i) { var st = map.getFeatureState({ source: 'catastro', id: i }); return (st.t || 0) > 0 || (st.a || 0) > 0; };
+      map.on('click', 'edificios', function (e) { if (e.defaultPrevented) return; var f = e.features && e.features[0]; if (f && tiene(f.id)) abrirFicha(f.id, e.lngLat); });
+      map.on('mousemove', 'edificios', function (e) { var f = e.features && e.features[0]; map.getCanvas().style.cursor = f && tiene(f.id) ? 'pointer' : ''; });
       map.on('mouseleave', 'edificios', function () { map.getCanvas().style.cursor = ''; });
     });
   });
