@@ -68,6 +68,10 @@ button, input { font: inherit; color: inherit; }
 h1 { margin: 0; font-size: 21px; line-height: 1.12; font-weight: 700; letter-spacing: -.015em; text-wrap: balance; }
 h1 em { font-style: normal; color: var(--accent); }
 #resumen { color: var(--muted); font-size: 12.5px; margin-top: -4px; }
+#enCalle { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 11px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, var(--panel)); border: 1px solid var(--accent); font-size: 12.5px; }
+#enCalle[hidden] { display: none; }
+#enCalle span { flex: 1; min-width: 0; }
+#enCalle button { flex: none; height: 28px; padding: 0 11px; border: 0; border-radius: 99px; background: var(--accent); color: var(--on-color); font: 600 12.5px/1 var(--font); cursor: pointer; }
 #resumen b { color: var(--ink); font-weight: 600; }
 
 /* Barra: reparto de los m² construidos entre usos, a escala */
@@ -251,6 +255,7 @@ html, body { touch-action: manipulation; }
     <div id="fecha">Datos del Registro de Turismo de Andalucía a 13 de noviembre de 2026</div>
     <form id="vbuscar" role="search"><input id="vq" type="search" placeholder="Busca una calle, un hotel o un nº de registro" aria-label="Buscar por calle, nombre del establecimiento o número de registro" autocomplete="off"></form>
     <ul id="vres" aria-label="Resultados"></ul>
+    <div id="enCalle" hidden><span id="enCalleT"></span><button type="button" id="quitarCalle">Ver toda la ciudad</button></div>
 
     <div id="vut">
       <div class="sec"><h2>Viviendas turísticas</h2><div class="ver" id="verVut" role="group" aria-label="Viviendas turísticas en el mapa"><button type="button" data-on="1" aria-pressed="true">Activar</button><button type="button" data-on="0" aria-pressed="false">Desactivar</button></div></div>
@@ -323,7 +328,7 @@ html, body { touch-action: manipulation; }
       var LA = AL.filter(enAnio2), pa = 0; LA.forEach(function (a) { pa += a.plz; });
       if (AL.length) {
         $('alSub').innerHTML = '<b class="num">' + fmt.format(LA.length) + '</b> establecimientos con <b class="num">' + fmt.format(pa) + '</b> plazas' + (ANIO2 ? ', inscritos ' + enTexto(ANIO2) : '') + (Object.keys(TSEL).length ? ' (con algunos tipos desactivados)' : '');
-        var hayT = Object.keys(TSEL).length || !VER_A, LY = AL.filter(function (a) { return FA.en(a.f); });
+        var hayT = Object.keys(TSEL).length || !VER_A, LY = AL.filter(function (a) { return FA.en(a.f) && enCalle(a.rc); });
         $('alTipos').innerHTML = '<tr><th>' + (hayT ? '<button type="button" class="todos">Ver todos los tipos</button>' : 'Tipo · pulsa para activar o desactivar') + '</th><th>Establec.</th><th>Plazas</th></tr>' + GRUPOS.map(function (g, i) {
           var n = 0, p = 0; LY.forEach(function (a) { if (g.f(a)) { n++; p += a.plz; } });
           return n ? '<tr data-g="' + i + '" class="' + (TSEL[i] || !VER_A ? 'off' : 'sel') + '"><td><button type="button" aria-pressed="' + !(TSEL[i] || !VER_A) + '" title="' + (TSEL[i] || !VER_A ? 'Pulsa para activar' : 'Pulsa para desactivar') + '"><i></i>' + g.n + '</button></td><td>' + fmt.format(n) + '</td><td' + (g.sinPlazas ? ' title="El registro no indica plazas para las áreas de autocaravanas">—' : '>' + fmt.format(p)) + '</td></tr>' : ''; }).join('');
@@ -334,6 +339,7 @@ html, body { touch-action: manipulation; }
       else if (VER_V) R = '<b class="num">' + fmt.format(pv) + '</b> plazas en viviendas turísticas inscritas en el municipio' + fil + ' (hoteles, hostales y similares desactivados)';
       else if (VER_A) R = '<b class="num">' + fmt.format(pa) + '</b> plazas en hoteles, hostales y similares inscritos en el municipio' + fil + ' (viviendas turísticas desactivadas)';
       else R = 'Las dos secciones están desactivadas. Pulsa «Activar» en una de ellas para verla en el mapa.';
+      if (ENCALLE && (VER_V || VER_A)) R = R.replace(' en el municipio', ' en ' + esc(CALLE_N));
       $('resumen').innerHTML = R;
     }
   }
@@ -359,7 +365,7 @@ html, body { touch-action: manipulation; }
   var sinTipo = function (n) { return n.replace(TIPOS, ''); };
   function totalCalle(si) { var vistos = {}, tot = 0; SP[si].forEach(function (k) { var rc = P[k].rc; if (!vistos[rc]) { vistos[rc] = 1; tot += nVut(rc); } }); return tot; }
   function verCalle(si) {
-    var ps = SP[si];
+    var ps = SP[si]; ponerCalle(si);
     $('vres').innerHTML = '<li><button type="button" data-volver="1"><span class="n">← ' + esc(S[si]) + '<small>' + totalCalle(si) + ' viviendas turísticas inscritas en sus edificios</small></span></button></li>';
     if (map && ps.length) {
       var b = new maplibregl.LngLatBounds(); ps.forEach(function (k) { b.extend([P[k].lon, P[k].lat]); });
@@ -369,6 +375,7 @@ html, body { touch-action: manipulation; }
   $('vbuscar').addEventListener('submit', function (e) { e.preventDefault(); });
   $('vq').addEventListener('input', function () {
     var q = norm(this.value);
+    if (!q && ENCALLE) ponerCalle(null);
     if (q.length < 2) { $('vres').innerHTML = ''; return; }
     var html = '';
     // Número de registro (VUT/MA/12345 o solo el número)
@@ -518,7 +525,19 @@ html, body { touch-action: manipulation; }
   var enTexto = function (t) { return /^antes/.test(t) ? t : 'en ' + t; };
   var FV = Filtro({ id: 'anio', suf: '', unidad: 'viviendas', activa: function () { return VER_V; }, items: function () { return V.map(function (v) { return { f: v.f, p: v.plz }; }); },
     cambio: function () { ANIO = FV.texto; aplicarVut(); } });
-  var enAnio = function (v) { return FV.en(v.f); };
+  // Filtro de calle elegido en el buscador: solo los edificios con portal en esa vía
+  var ENCALLE = null, CALLE_N = '';
+  var enCalle = function (rc) { return !ENCALLE || !!ENCALLE[rc]; };
+  function ponerCalle(si) {
+    if (si == null) { ENCALLE = null; CALLE_N = ''; }
+    else { ENCALLE = {}; SP[si].forEach(function (k) { ENCALLE[P[k].rc] = 1; }); CALLE_N = S[si]; }
+    $('enCalle').hidden = !ENCALLE;
+    $('enCalleT').innerHTML = ENCALLE ? 'Solo se muestra <b>' + esc(CALLE_N) + '</b>' : '';
+    if (popup) popup.remove();
+    pintarPanel(); repintar();
+  }
+  $('quitarCalle').addEventListener('click', function () { ponerCalle(null); $('vq').value = ''; $('vres').innerHTML = ''; });
+  var enAnio = function (v) { return FV.en(v.f) && enCalle(v.rc); };
   var deAnio = function (rc) { return (VB[rc] || []).filter(enAnio); };
   function aplicarVut() {
     pintarPanel();
@@ -604,7 +623,7 @@ html, body { touch-action: manipulation; }
   // Filtro por tipo (pulsando la tabla): varios a la vez; ninguno elegido = todos
   var TSEL = {}; // tipos DESACTIVADOS; vacío = todos activados
   var enTipo = function (a) { for (var g in TSEL) if (GRUPOS[g].f(a)) return false; return true; };
-  var enAnio2 = function (a) { return FA.en(a.f) && enTipo(a); };
+  var enAnio2 = function (a) { return FA.en(a.f) && enTipo(a) && enCalle(a.rc); };
   $('alTipos').addEventListener('click', function (e) {
     var r = e.target.closest('[data-g]');
     if (r && !VER_A) { // sección desactivada: pulsar un tipo enciende la sección solo con ese tipo
