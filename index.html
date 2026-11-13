@@ -307,7 +307,7 @@ html, body { touch-action: manipulation; }
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   // Versión de los datos: evita que el navegador use una copia antigua de los .txt tras una actualización
-  var VDATOS = '44';
+  var VDATOS = '45';
   var fmt = new Intl.NumberFormat('es-ES', { useGrouping: 'always' });
   var fmt1 = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
   var css = function (name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); };
@@ -321,7 +321,8 @@ html, body { touch-action: manipulation; }
     { id: 'c', nombre: 'Comercial', desc: 'Comercio, hostelería y ocio' },
     { id: 'a', nombre: 'Agrario', desc: 'Construcciones agrarias y edificios en suelo rústico' },
     { id: 'o', nombre: 'Oficinas', desc: 'Edificios de oficinas' },
-    { id: 'x', nombre: 'Sin uso asignado', desc: 'El Catastro no indica el uso' }
+    { id: 'x', nombre: 'Sin uso asignado', desc: 'El Catastro no indica el uso' },
+    { id: 'p', nombre: 'Parcela', desc: 'Parcela sin construcción en el Catastro: se dibuja su contorno' }
   ];
   var USO = {}; USOS.forEach(function (u) { USO[u.id] = u; });
 
@@ -901,8 +902,8 @@ html, body { touch-action: manipulation; }
     var n = deAnio(ref).length, hayAl = listaAloj(ref) !== '';
     var html = '<div class="pop" style="--c:' + (n ? css('--vt-3') : hayAl ? css('--al') : css('--muted')) + '"><span class="uso">' + (n ? (hayAl ? 'Viviendas turísticas y hotel, hostal o similar' : 'Con viviendas turísticas') : hayAl ? 'Hotel, hostal o similar' : ANIO ? 'Ninguna inscrita en ' + ANIO : 'Sin viviendas turísticas inscritas') + '</span>' +
       portalesDe(ref) + listaVut(ref, !hayAl).replace('class="vt"', 'class="vt" style="border:0;padding-top:0"') + listaAloj(ref) +
-      '<div class="note">Según el Catastro: uso ' + USO[E.u[i]].nombre.toLowerCase() + (E.v[i] ? ', ' + fmt.format(E.v[i]) + (E.v[i] === 1 ? ' vivienda' : ' viviendas') : ', sin viviendas') +
-      (E.u[i] !== 'r' && E.v[i] ? '. La parcela mezcla viviendas y otros usos.' : '') + '<br>Ref. catastral ' + esc(ref) + ' · <a href="' + sede + '" target="_blank" rel="noopener">Ver en la Sede del Catastro</a></div>' + AVISO + acciones('rc=' + ref) + '</div>';
+      '<div class="note">' + (E.u[i] === 'p' ? 'El Catastro aún no tiene dibujado este edificio: se muestra la forma de su parcela' : 'Según el Catastro: uso ' + USO[E.u[i]].nombre.toLowerCase() + (E.v[i] ? ', ' + fmt.format(E.v[i]) + (E.v[i] === 1 ? ' vivienda' : ' viviendas') : ', sin viviendas') +
+      (E.u[i] !== 'r' && E.v[i] ? '. La parcela mezcla viviendas y otros usos.' : '')) + '<br>Ref. catastral ' + esc(ref) + ' · <a href="' + sede + '" target="_blank" rel="noopener">Ver en la Sede del Catastro</a></div>' + AVISO + acciones('rc=' + ref) + '</div>';
     if (popup) popup.remove();
     popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map);
   }
