@@ -97,6 +97,8 @@ h1 em { font-style: normal; color: var(--accent); }
 #alTipos tr[data-g] { cursor: pointer; }
 .apagada .anios .b { opacity: .3; }
 .apagada .esc, .apagada .sub { opacity: .5; }
+/* Sección desactivada: se pliega y solo queda su cabecera con Activar | Desactivar */
+#vut.apagada > :not(.sec), #aloj.apagada > :not(.sec) { display: none; }
 #alTipos tr[data-g]:hover td { background: var(--panel-2); }
 #alTipos td button { border: 0; background: none; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; text-align: left; }
 #alTipos td button i { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--al); flex: none; }
