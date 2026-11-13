@@ -249,7 +249,7 @@ html, body { touch-action: manipulation; }
     <h1 id="titulo">Plazas turísticas en <em>Málaga</em></h1>
     <div id="resumen">Cargando los edificios del Catastro…</div>
     <div id="fecha">Datos del Registro de Turismo de Andalucía a 13 de noviembre de 2026</div>
-    <form id="vbuscar" role="search"><input id="vq" type="search" placeholder="Busca calle y número, hotel o nº de registro" aria-label="Buscar por dirección, nombre del establecimiento o número de registro" autocomplete="off"></form>
+    <form id="vbuscar" role="search"><input id="vq" type="search" placeholder="Busca una calle, un hotel o un nº de registro" aria-label="Buscar por calle, nombre del establecimiento o número de registro" autocomplete="off"></form>
     <ul id="vres" aria-label="Resultados"></ul>
 
     <div id="vut">
@@ -360,8 +360,7 @@ html, body { touch-action: manipulation; }
   function totalCalle(si) { var vistos = {}, tot = 0; SP[si].forEach(function (k) { var rc = P[k].rc; if (!vistos[rc]) { vistos[rc] = 1; tot += nVut(rc); } }); return tot; }
   function verCalle(si) {
     var ps = SP[si];
-    $('vres').innerHTML = '<li><button type="button" data-volver="1"><span class="n">← ' + esc(S[si]) + '<small>' + ps.length + ' portales · ' + totalCalle(si) + ' viviendas turísticas inscritas en sus edificios</small></span></button></li>' +
-      ps.map(function (k) { var o = P[k]; return '<li><button type="button" data-p="' + k + '"><span class="n">Nº ' + esc(o.num) + '<small>' + esc(o.cp) + ' Málaga</small></span>' + etiqueta(nVut(o.rc)) + '</button></li>'; }).join('');
+    $('vres').innerHTML = '<li><button type="button" data-volver="1"><span class="n">← ' + esc(S[si]) + '<small>' + totalCalle(si) + ' viviendas turísticas inscritas en sus edificios</small></span></button></li>';
     if (map && ps.length) {
       var b = new maplibregl.LngLatBounds(); ps.forEach(function (k) { b.extend([P[k].lon, P[k].lat]); });
       map.fitBounds(b, { padding: innerWidth > 720 ? { top: 80, bottom: 80, left: 420, right: 80 } : 60, maxZoom: 18, duration: 900 });
@@ -393,14 +392,14 @@ html, body { touch-action: manipulation; }
     var cand = [];
     for (var k = 0; k < S.length; k++) { var pos = sinTipo(SN[k]).indexOf(calle); if (pos >= 0) cand.push([pos === 0 ? 0 : 1, k]); }
     cand.sort(function (a, b) { return a[0] - b[0] || SN[a[1]].localeCompare(SN[b[1]], 'es'); });
-    if (num) {
+    if (false) { // ya no se listan números de portal concretos: solo vías
       var n = 0;
       cand.forEach(function (c) { SP[c[1]].forEach(function (k) { if (n < 40 && P[k].num.split(' ')[0] === num) { n++;
         html += '<li><button type="button" data-p="' + k + '"><span class="n">' + esc(S[c[1]]) + ', ' + esc(P[k].num) + '<small>' + esc(P[k].cp) + ' Málaga</small></span>' + etiqueta(nVut(P[k].rc)) + '</button></li>'; } }); });
       if (!n) html += '<li class="vacio">Ese número no aparece en el callejero del Catastro. Prueba solo con el nombre de la calle.</li>';
     } else {
       html += cand.slice(0, 40).map(function (c) {
-        return '<li><button type="button" data-s="' + c[1] + '"><span class="n">' + esc(S[c[1]]) + '<small>' + SP[c[1]].length + ' portales</small></span>' + etiqueta(totalCalle(c[1])) + '</button></li>'; }).join('');
+        return '<li><button type="button" data-s="' + c[1] + '"><span class="n">' + esc(S[c[1]]) + '</span>' + etiqueta(totalCalle(c[1])) + '</button></li>'; }).join('');
       if (!cand.length && !html) html = '<li class="vacio">No hay ninguna calle con ese nombre en el callejero del Catastro de Málaga.</li>';
     }
     $('vres').innerHTML = html;
