@@ -274,7 +274,7 @@ h1 em { font-style: normal; color: var(--accent); }
       <p>· 93 viviendas turísticas y 1 establecimiento del registro de Málaga cuya dirección queda fuera del término municipal.<br>· 23 establecimientos cuya dirección no se ha podido situar en un edificio ni en un punto del mapa.<br>· Los alojamientos que no están inscritos, ni la ocupación real de las plazas.</p>
       <p>Que una vivienda no figure en el mapa significa que posiblemente no esté inscrita o que su dirección no coincide con la del Catastro; no implica por sí solo que sea ilegal.</p>
     </details>
-    <div id="reportar">¿Has visto un error? <a id="reportarA" href="https://github.com/alvarocarrillomlg/malaga/issues/new" target="_blank" rel="noopener">Avísanos</a></div>
+    <div id="reportar">¿Has visto un error? <a id="reportarA" href="#">Avísanos</a></div>
     <div id="autorPanel">Elaborado por: <b>Álvaro Carrillo</b></div>
     <button id="mini" class="franja" type="button" aria-label="Minimizar el panel" title="Minimizar el panel para ver todo el mapa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
   </section>
@@ -814,6 +814,12 @@ h1 em { font-style: normal; color: var(--accent); }
     if (innerWidth <= 720) $('app').classList.add('mini');
     map.once('idle', abrir);
   }
+  // El correo no aparece escrito en la página: se compone solo al pulsar «Avísanos»
+  $('reportarA').addEventListener('click', function (e) {
+    e.preventDefault();
+    var d = ['moc.liamg', 'glmollirracoravla'].map(function (x) { return x.split('').reverse().join(''); });
+    location.href = 'mailto:' + d[1] + '@' + d[0] + '?subject=' + encodeURIComponent('Error en el mapa de plazas turísticas de Málaga');
+  });
   var FECHA = function (f) { return f && f.length === 8 ? f.slice(6, 8) + '/' + f.slice(4, 6) + '/' + f.slice(0, 4) : ''; };
   function listaVut(rc, enEdificio) {
     var L = deAnio(rc), nota = ANIO ? '<div class="filtro">Solo se muestran las inscritas en ' + ANIO + ' (' + (VB[rc] || []).length + ' en total). Elige «Todos los años» para verlas todas.</div>' : '';
