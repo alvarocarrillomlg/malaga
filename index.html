@@ -118,7 +118,6 @@ h1 em { font-style: normal; color: var(--accent); }
 #alTipos td button { border: 0; background: none; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; text-align: left; }
 #alTipos td button i { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--al); flex: none; }
 #alTipos tr.sel td button i { background: var(--al); }
-#alTipos tr.sel td { font-weight: 600; }
 #alTipos tr.off td { color: var(--muted); }
 #alTipos th .todos { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--accent); cursor: pointer; }
 #alTipos td { text-align: right; padding: 3px 0 3px 8px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
@@ -348,11 +347,11 @@ h1 em { font-style: normal; color: var(--accent); }
       $('vutSub').innerHTML = '<b class="num">' + fmt.format(LV.length) + '</b> viviendas con <b class="num">' + fmt.format(pv) + '</b> plazas' + (ANIO ? ', inscritas en ' + ANIO : '');
       var LA = AL.filter(enAnio2), pa = 0; LA.forEach(function (a) { pa += a.plz; });
       if (AL.length) {
-        $('alSub').innerHTML = '<b class="num">' + fmt.format(LA.length) + '</b> establecimientos con <b class="num">' + fmt.format(pa) + '</b> plazas' + (ANIO2 ? ', inscritos ' + enTexto(ANIO2) : '') + (Object.keys(TSEL).length ? ' (tipos elegidos)' : '');
+        $('alSub').innerHTML = '<b class="num">' + fmt.format(LA.length) + '</b> establecimientos con <b class="num">' + fmt.format(pa) + '</b> plazas' + (ANIO2 ? ', inscritos ' + enTexto(ANIO2) : '') + (Object.keys(TSEL).length ? ' (con algunos tipos desactivados)' : '');
         var hayT = Object.keys(TSEL).length, LY = AL.filter(function (a) { return FA.en(a.f); });
-        $('alTipos').innerHTML = '<tr><th>' + (hayT ? '<button type="button" class="todos">Ver todos los tipos</button>' : 'Tipo · pulsa para filtrar') + '</th><th>Establec.</th><th>Plazas</th></tr>' + GRUPOS.map(function (g, i) {
+        $('alTipos').innerHTML = '<tr><th>' + (hayT ? '<button type="button" class="todos">Ver todos los tipos</button>' : 'Tipo · pulsa para activar o desactivar') + '</th><th>Establec.</th><th>Plazas</th></tr>' + GRUPOS.map(function (g, i) {
           var n = 0, p = 0; LY.forEach(function (a) { if (g.f(a)) { n++; p += a.plz; } });
-          return n ? '<tr data-g="' + i + '" class="' + (TSEL[i] ? 'sel' : hayT ? 'off' : '') + '"><td><button type="button" aria-pressed="' + !!TSEL[i] + '"><i></i>' + g.n + '</button></td><td>' + fmt.format(n) + '</td><td>' + fmt.format(p) + '</td></tr>' : ''; }).join('');
+          return n ? '<tr data-g="' + i + '" class="' + (TSEL[i] ? 'off' : 'sel') + '"><td><button type="button" aria-pressed="' + !TSEL[i] + '" title="' + (TSEL[i] ? 'Pulsa para activar' : 'Pulsa para desactivar') + '"><i></i>' + g.n + '</button></td><td>' + fmt.format(n) + '</td><td>' + fmt.format(p) + '</td></tr>' : ''; }).join('');
       }
       var filtrado = ANIO || ANIO2 || Object.keys(TSEL).length;
       $('resumen').innerHTML = '<b class="num">' + fmt.format(pv + pa) + '</b> plazas turísticas inscritas en el municipio' + (filtrado ? ' con los filtros elegidos' : '') + ': <b class="num">' + fmt.format(pv) + '</b> en viviendas turísticas y <b class="num">' + fmt.format(pa) + '</b> en hoteles, hostales y similares';
@@ -638,8 +637,8 @@ h1 em { font-style: normal; color: var(--accent); }
   var FA = Filtro({ id: 'anio', suf: '2', antes: 2000, cadaEtiqueta: 5, unidad: 'establecimientos', items: function () { return AL.filter(enTipo).map(function (a) { return { f: a.f, p: a.plz }; }); },
     cambio: function () { ANIO2 = FA.texto; aplicarAloj(); } });
   // Filtro por tipo (pulsando la tabla): varios a la vez; ninguno elegido = todos
-  var TSEL = {};
-  var enTipo = function (a) { for (var g in TSEL) if (GRUPOS[g].f(a)) return true; return !Object.keys(TSEL).length; };
+  var TSEL = {}; // tipos DESACTIVADOS; vacío = todos activados
+  var enTipo = function (a) { for (var g in TSEL) if (GRUPOS[g].f(a)) return false; return true; };
   var enAnio2 = function (a) { return FA.en(a.f) && enTipo(a); };
   $('alTipos').addEventListener('click', function (e) {
     var r = e.target.closest('[data-g]'); if (r) { var g = r.dataset.g; if (TSEL[g]) delete TSEL[g]; else TSEL[g] = 1; }
