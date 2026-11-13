@@ -101,9 +101,13 @@ h1 em { font-style: normal; color: var(--accent); }
 #aloj { border-top: 1px solid var(--line); padding-top: 12px; }
 .sec { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .sec h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
-.sec .ver { flex: none; height: 30px; padding: 0 14px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.sec .ver { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 6px 0 12px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; }
 .sec .ver:hover { background: var(--panel-2); }
-.sec .ver.oculto { background: var(--accent); border-color: var(--accent); color: var(--on-color); }
+.sec .ver .sw { position: relative; width: 38px; height: 22px; border-radius: 99px; background: var(--accent); transition: background .15s; }
+.sec .ver .sw::after { content: ""; position: absolute; top: 3px; left: 19px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: left .15s; }
+.sec .ver[aria-checked="false"] { color: var(--muted); }
+.sec .ver[aria-checked="false"] .sw { background: #b3bec3; }
+.sec .ver[aria-checked="false"] .sw::after { left: 3px; }
 .sec { align-items: center; }
 .sec label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .sec input { accent-color: var(--accent); margin: 0; }
@@ -262,7 +266,7 @@ h1 em { font-style: normal; color: var(--accent); }
     <ul id="vres" aria-label="Resultados"></ul>
 
     <div id="vut">
-      <div class="sec"><h2>Viviendas turísticas</h2><button type="button" class="ver" id="verVut" aria-label="Desactivar las viviendas turísticas en el mapa">Desactivar</button></div>
+      <div class="sec"><h2>Viviendas turísticas</h2><button type="button" class="ver" id="verVut" role="switch" aria-checked="true" aria-label="Viviendas turísticas en el mapa"><span class="t">Activado</span><span class="sw" aria-hidden="true"></span></button></div>
       <div class="sub" id="vutSub"></div>
       <div id="filtroAnio" class="filtroAnio"><span id="anioLbl" class="anioLbl">Año</span><details id="anioDd" class="anioDd"><summary id="anioSum" class="anioSum" aria-labelledby="anioLbl anioSum">Todos los años</summary><div id="anioLista" class="anioLista" role="group" aria-labelledby="anioLbl"></div></details></div>
       <div id="aniosW" class="aniosW"><div id="anios" class="anios" role="group" aria-label="Viviendas turísticas inscritas cada año. Pulsa un año para verlo en el mapa"></div><small>Viviendas inscritas cada año que siguen hoy en el registro. Pulsa una o varias barras para verlas en el mapa.</small></div>
@@ -272,7 +276,7 @@ h1 em { font-style: normal; color: var(--accent); }
     </div>
 
     <div id="aloj">
-      <div class="sec"><h2>Hoteles, hostales y similares</h2><button type="button" class="ver" id="verAl" aria-label="Desactivar los hoteles, hostales y similares en el mapa">Desactivar</button></div>
+      <div class="sec"><h2>Hoteles, hostales y similares</h2><button type="button" class="ver" id="verAl" role="switch" aria-checked="true" aria-label="Hoteles, hostales y similares en el mapa"><span class="t">Activado</span><span class="sw" aria-hidden="true"></span></button></div>
       <div class="sub" id="alSub">Cargando el Registro de Turismo…</div>
       <div class="filtroAnio"><span id="anioLbl2" class="anioLbl">Año</span><details id="anioDd2" class="anioDd"><summary id="anioSum2" class="anioSum" aria-labelledby="anioLbl2 anioSum2">Todos los años</summary><div id="anioLista2" class="anioLista" role="group" aria-labelledby="anioLbl2"></div></details></div>
       <div class="aniosW"><div id="anios2" class="anios" role="group" aria-label="Establecimientos inscritos cada año. Pulsa un año para verlo en el mapa"></div><small>Establecimientos inscritos cada año que siguen hoy en el registro; la primera barra reúne los inscritos antes de 2000. Pulsa una o varias barras para verlos en el mapa.</small></div>
@@ -683,7 +687,7 @@ h1 em { font-style: normal; color: var(--accent); }
     if (popup) popup.remove();
     popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map);
   }
-  function botonVer(b, ver, que) { b.textContent = ver ? 'Desactivar' : 'Activar'; b.classList.toggle('oculto', !ver); b.setAttribute('aria-label', (ver ? 'Desactivar ' : 'Activar ') + que + ' en el mapa'); }
+  function botonVer(b, ver) { b.querySelector('.t').textContent = ver ? 'Activado' : 'Desactivado'; b.setAttribute('aria-checked', ver); }
   // Al volver a activar una sección se activa todo lo suyo: todos los años y, en hoteles, todos los tipos.
   $('verVut').addEventListener('click', function () { VER_V = !VER_V; botonVer(this, VER_V, 'las viviendas turísticas'); if (popup) popup.remove();
     if (VER_V && FV.texto) FV.cambiar(null); else repintar(); });
