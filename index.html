@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Plazas turísticas en Málaga</title>
+<meta name="description" content="Viviendas turísticas, hoteles y demás alojamientos inscritos en el Registro de Turismo de Andalucía en Málaga, sobre los edificios del Catastro.">
+<meta name="claude:viewport-fit-sides" content="cover">
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Mapa a pantalla completa con cada edificio del Catastro coloreado por su uso principal.
+   El panel flotante hace de leyenda, filtro y resumen (nº de edificios y m² construidos por uso).
+   Mismo sistema visual que «La movilidad de Málaga en directo». */
+:root {
+  --bg: #e9eeee;
+  --panel: #ffffff;
+  --panel-2: #f2f5f5;
+  --ink: #13222c;
+  --muted: #586973;
+  --line: #d6dee0;
+  --accent: #0b6f6a;
+  --on-color: #ffffff;
+  /* Usos del Catastro (INSPIRE) */
+  --u-r: #e39b2d;
+  --u-c: #d63c3c;
+  --u-o: #8e4ec6;
+  --u-s: #1f73c4;
+  --u-i: #4f5d69;
+  --u-a: #4a9a36;
+  --u-x: #b3bec3;
+  /* Viviendas turísticas: edificios sin ninguna y escala por número de viviendas inscritas */
+  --vt-0: #d5dcde;
+  --vt-1: #f6c3cf;
+  --vt-2: #e8809a;
+  --vt-3: #c93a63;
+  --vt-4: #7c1338;
+  /* Hoteles, hostales, apartamentos y similares */
+  --al: #2457a6;
+  --shadow: 0 6px 24px rgba(19, 34, 44, .16);
+  --font: Matter, "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+}
+/* Un solo aspecto, claro, también cuando el dispositivo está en modo oscuro (como el mapa de movilidad). */
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.35; overflow: hidden; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+
+#app { position: relative; height: 100%; }
+#map { position: absolute; inset: 0; background: var(--bg); }
+
+/* ---------- Panel ---------- */
+#panel {
+  position: absolute; z-index: 5;
+  top: calc(14px + env(safe-area-inset-top, 0px)); left: max(14px, env(safe-area-inset-left, 0px));
+  width: 368px; max-height: calc(100% - 40px);
+  display: flex; flex-direction: column; gap: 11px;
+  padding: 16px 18px 12px; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow);
+}
+h1 { margin: 0; font-size: 21px; line-height: 1.12; font-weight: 700; letter-spacing: -.015em; text-wrap: balance; }
+h1 em { font-style: normal; color: var(--accent); }
+#resumen { color: var(--muted); font-size: 12.5px; margin-top: -4px; }
+#resumen b { color: var(--ink); font-weight: 600; }
+
+/* Barra: reparto de los m² construidos entre usos, a escala */
+#barra { flex: none; display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--panel-2); }
+#barra span { display: block; height: 100%; flex-basis: 0; flex-shrink: 1; transition: flex-grow .3s; }
+
+/* Medida y ámbito */
+.ctrls { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.seg { display: inline-flex; padding: 2px; background: var(--panel-2); border-radius: 99px; }
+.seg button { height: 26px; padding: 0 11px; border: 0; border-radius: 99px; background: none; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(19, 34, 44, .18); }
+
+#layers { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.layer {
+  display: grid; grid-template-columns: auto 1fr; column-gap: 8px; row-gap: 2px; align-items: center; text-align: left;
+  padding: 9px 10px; background: var(--panel-2); border: 1.5px solid transparent; border-radius: 10px; cursor: pointer;
+}
+.layer .big { grid-column: 1 / -1; font-size: 20px; font-weight: 700; letter-spacing: -.02em; line-height: 1.05; }
+.layer .big small { font-size: 11.5px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.layer .lbl { font-size: 12px; color: var(--ink); line-height: 1.2; }
+.layer .lbl small { display: block; color: var(--muted); font-size: 11px; }
+.layer .sw { width: 12px; height: 12px; border-radius: 3px; background: var(--c); box-shadow: 0 0 0 2px var(--panel); align-self: start; margin-top: 2px; }
+.layer[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 10%, var(--panel)); border-color: var(--c); }
+.layer[aria-pressed="false"] { opacity: .55; }
+.layer[aria-pressed="false"] .big { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.layer:hover { filter: brightness(.97); }
+.layer.todo { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; }
+.layer.todo .lbl { color: var(--muted); }
+
+#estado { font-size: 12.5px; color: var(--muted); }
+#modo { display: flex; width: 100%; }
+#modo button { flex: 1; }
+#panel > * { flex-shrink: 0; }
+#vut, #aloj { display: grid; gap: 10px; }
+#aloj { border-top: 1px solid var(--line); padding-top: 12px; }
+.sec { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.sec h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
+.sec .ver { flex: none; height: 30px; padding: 0 14px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.sec .ver:hover { background: var(--panel-2); }
+.sec .ver.oculto { background: var(--accent); border-color: var(--accent); color: var(--on-color); }
+.sec { align-items: center; }
+.sec label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.sec input { accent-color: var(--accent); margin: 0; }
+.sub { font-size: 12.5px; color: var(--muted); margin-top: -6px; }
+.sub b { color: var(--ink); font-weight: 600; }
+#alTipos { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+#alTipos th { text-align: right; font-weight: 500; color: var(--muted); font-size: 11px; padding: 0 0 3px 8px; }
+#alTipos th:first-child, #alTipos td:first-child { text-align: left; padding-left: 0; }
+#alTipos tr[data-g] { cursor: pointer; }
+#alTipos tr[data-g]:hover td { background: var(--panel-2); }
+#alTipos td button { border: 0; background: none; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; text-align: left; }
+#alTipos td button i { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--al); flex: none; }
+#alTipos tr.sel td button i { background: var(--al); }
+#alTipos tr.sel td { font-weight: 600; }
+#alTipos tr.off td { color: var(--muted); }
+#alTipos th .todos { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--accent); cursor: pointer; }
+#alTipos td { text-align: right; padding: 3px 0 3px 8px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.esc .rayas { background: repeating-linear-gradient(135deg, var(--al) 0 3px, var(--vt-3) 3px 6px); }
+.esc .circ { width: var(--d); height: var(--d); border-radius: 50%; background: var(--al); border: 1.5px solid #fff; box-shadow: 0 0 0 1px var(--al); }
+.pop .al { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 8px; }
+.pop .al h4 { margin: 0 0 6px; font-size: 13px; }
+.pop .al h4 b { color: var(--al); }
+.pop .al ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; max-height: 190px; overflow-y: auto; font-size: 12px; }
+.pop .al li b { display: block; font-size: 12.5px; }
+.pop .al small { color: var(--muted); }
+.esc { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); }
+.esc span { display: inline-flex; align-items: center; gap: 5px; }
+.esc i { width: 12px; height: 12px; border-radius: 3px; background: var(--c); display: inline-block; }
+#vq { width: 100%; height: 36px; padding: 0 11px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; }
+#vres { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 240px; overflow-y: auto; }
+#vres button { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; text-align: left; padding: 7px 8px; background: none; border: 0; border-radius: 8px; cursor: pointer; }
+#vres button:hover, #vres button:focus-visible { background: var(--panel-2); }
+#vres .n { font-size: 13px; font-weight: 600; line-height: 1.2; min-width: 0; }
+#vres .n small { display: block; font-weight: 400; color: var(--muted); font-size: 11.5px; }
+#vres .v { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+#vres .vacio { padding: 6px 8px; color: var(--muted); font-size: 12.5px; }
+.filtroAnio { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.anioLbl { font-size: 12.5px; font-weight: 600; }
+.anioDd { position: relative; }
+.anioSum { list-style: none; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 13px; cursor: pointer; white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.anioSum::-webkit-details-marker { display: none; }
+.anioSum::after { content: ""; flex: none; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: translateY(-2px) rotate(45deg); margin-left: auto; }
+.anioLista { position: absolute; right: 0; top: 36px; z-index: 5; width: 190px; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); display: grid; gap: 1px; }
+.anioLista label { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.anioLista label:hover { background: var(--panel-2); }
+.anioLista label small { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.anioLista input { accent-color: var(--accent); margin: 0; }
+.anioLista .todos { border: 0; background: none; text-align: left; padding: 5px 6px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--accent); cursor: pointer; }
+.anioLista .todos:hover { background: var(--panel-2); }
+.anios { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; align-items: end; height: 84px; }
+.anios button { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; padding: 0; border: 0; background: none; cursor: pointer; }
+.anios .b { display: block; background: color-mix(in srgb, var(--accent) 45%, var(--panel)); border-radius: 4px 4px 0 0; min-height: 2px; }
+.anios button:hover .b, .anios button[aria-pressed="true"] .b { background: var(--accent); }
+.aniosW small { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; }
+.anios.hay-sel button[aria-pressed="false"] .b { opacity: .45; }
+.anios .y { font-size: 10px; color: var(--muted); text-align: center; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.anios .c { text-align: center; margin-bottom: 2px; font-size: 10px; font-weight: 700; color: var(--ink); white-space: nowrap; visibility: hidden; font-variant-numeric: tabular-nums; }
+.anios button:hover .c, .anios button[aria-pressed="true"] .c, .anios button.max .c { visibility: visible; }
+.pop .filtro { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+.aviso { font-size: 12px; color: var(--muted); background: var(--panel-2); border-radius: 10px; padding: 9px 11px; display: grid; gap: 4px; }
+.aviso b { color: var(--ink); }
+#foot { font-size: 11.5px; color: var(--muted); padding-top: 10px; border-top: 1px solid var(--line); display: grid; gap: 5px; }
+#foot a { color: inherit; }
+#autorPanel { font-size: 12.5px; color: var(--muted); }
+#autorPanel b { color: var(--ink); font-weight: 600; }
+
+.franja { display: grid; place-items: center; height: 26px; padding: 0; color: var(--on-color); cursor: pointer; }
+.franja svg { width: 22px; height: 22px; }
+.franja:hover { filter: brightness(1.12); }
+#mini, #abrir { background: var(--accent); border-color: var(--accent); }
+#mini { flex: none; margin: -2px -18px -12px; width: calc(100% + 36px); border: 0; border-radius: 0 0 13px 13px; position: sticky; bottom: -12px; }
+#abrir { position: absolute; z-index: 3; border: 1px solid var(--accent); box-shadow: var(--shadow); top: calc(14px + env(safe-area-inset-top, 0px)); left: max(14px, env(safe-area-inset-left, 0px)); width: 368px; border-radius: 12px; }
+#abrir svg { transform: rotate(180deg); }
+#app:not(.mini) #abrir, #app.mini #panel { display: none; }
+
+#creditos { position: absolute; z-index: 1; left: max(14px, env(safe-area-inset-left, 0px)); bottom: calc(3px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 28px);
+  padding: 1px 5px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 75%, transparent); color: var(--muted); font-size: 10px; line-height: 1.3; }
+#creditos a { color: inherit; text-decoration: none; }
+
+/* ---------- MapLibre (hoja de estilos incluida, adaptada a los colores de la página) ---------- */
+.maplibregl-map{font:12px/20px Helvetica Neue,Arial,Helvetica,sans-serif;overflow:hidden;position:relative;-webkit-tap-highlight-color:rgb(0 0 0/0)}.maplibregl-canvas{left:0;position:absolute;top:0}.maplibregl-map:fullscreen{height:100%;width:100%}.maplibregl-ctrl-group button.maplibregl-ctrl-compass{touch-action:none}.maplibregl-canvas-container.maplibregl-interactive,.maplibregl-ctrl-group button.maplibregl-ctrl-compass{cursor:grab;-webkit-user-select:none;-moz-user-select:none;user-select:none}.maplibregl-canvas-container.maplibregl-interactive.maplibregl-track-pointer{cursor:pointer}.maplibregl-canvas-container.maplibregl-interactive:active,.maplibregl-ctrl-group button.maplibregl-ctrl-compass:active{cursor:grabbing}.maplibregl-canvas-container.maplibregl-touch-zoom-rotate,.maplibregl-canvas-container.maplibregl-touch-zoom-rotate .maplibregl-canvas{touch-action:pan-x pan-y}.maplibregl-canvas-container.maplibregl-touch-drag-pan,.maplibregl-canvas-container.maplibregl-touch-drag-pan .maplibregl-canvas{touch-action:pinch-zoom}.maplibregl-canvas-container.maplibregl-touch-zoom-rotate.maplibregl-touch-drag-pan,.maplibregl-canvas-container.maplibregl-touch-zoom-rotate.maplibregl-touch-drag-pan .maplibregl-canvas{touch-action:none}.maplibregl-canvas-container.maplibregl-touch-drag-pan.maplibregl-cooperative-gestures,.maplibregl-canvas-container.maplibregl-touch-drag-pan.maplibregl-cooperative-gestures .maplibregl-canvas{touch-action:pan-x pan-y}.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right,.maplibregl-ctrl-top-left,.maplibregl-ctrl-top-right{pointer-events:none;position:absolute;z-index:2}.maplibregl-ctrl-top-left{left:0;top:0}.maplibregl-ctrl-top-right{right:0;top:0}.maplibregl-ctrl-bottom-left{bottom:0;left:0}.maplibregl-ctrl-bottom-right{bottom:0;right:0}.maplibregl-ctrl{clear:both;pointer-events:auto;transform:translate(0)}.maplibregl-ctrl-top-left .maplibregl-ctrl{float:left;margin:10px 0 0 10px}.maplibregl-ctrl-top-right .maplibregl-ctrl{float:right;margin:10px 10px 0 0}.maplibregl-ctrl-bottom-left .maplibregl-ctrl{float:left;margin:0 0 10px 10px}.maplibregl-ctrl-bottom-right .maplibregl-ctrl{float:right;margin:0 10px 10px 0}.maplibregl-ctrl-group{background:#fff;border-radius:4px}.maplibregl-ctrl-group:not(:empty){box-shadow:0 0 0 2px rgba(0,0,0,.1)}@media (forced-colors:active){.maplibregl-ctrl-group:not(:empty){box-shadow:0 0 0 2px ButtonText}}.maplibregl-ctrl-group button{background-color:transparent;border:0;box-sizing:border-box;cursor:pointer;display:block;height:29px;outline:none;padding:0;width:29px}.maplibregl-ctrl-group button+button{border-top:1px solid #ddd}.maplibregl-ctrl button .maplibregl-ctrl-icon{background-position:50%;background-repeat:no-repeat;display:block;height:100%;width:100%}@media (forced-colors:active){.maplibregl-ctrl-icon{background-color:transparent}.maplibregl-ctrl-group button+button{border-top:1px solid ButtonText}}.maplibregl-ctrl button::-moz-focus-inner{border:0;padding:0}.maplibregl-ctrl-attrib-button:focus,.maplibregl-ctrl-group button:focus{box-shadow:0 0 2px 2px #0096ff}.maplibregl-ctrl button:disabled{cursor:not-allowed}.maplibregl-ctrl button:disabled .maplibregl-ctrl-icon{opacity:.25}.maplibregl-ctrl button:not(:disabled):hover{background-color:rgb(0 0 0/5%)}.maplibregl-ctrl-group button:focus:focus-visible{box-shadow:0 0 2px 2px #0096ff}.maplibregl-ctrl-group button:focus:not(:focus-visible){box-shadow:none}.maplibregl-ctrl-group button:focus:first-child{border-radius:4px 4px 0 0}.maplibregl-ctrl-group button:focus:last-child{border-radius:0 0 4px 4px}.maplibregl-ctrl-group button:focus:only-child{border-radius:inherit}.maplibregl-ctrl button.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23333' viewBox='0 0 29 29'%3E%3Cpath d='M10 13c-.75 0-1.5.75-1.5 1.5S9.25 16 10 16h9c.75 0 1.5-.75 1.5-1.5S19.75 13 19 13z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23333' viewBox='0 0 29 29'%3E%3Cpath d='M14.5 8.5c-.75 0-1.5.75-1.5 1.5v3h-3c-.75 0-1.5.75-1.5 1.5S9.25 16 10 16h3v3c0 .75.75 1.5 1.5 1.5S16 19.75 16 19v-3h3c.75 0 1.5-.75 1.5-1.5S19.75 13 19 13h-3v-3c0-.75-.75-1.5-1.5-1.5'/%3E%3C/svg%3E")}@media (forced-colors:active){.maplibregl-ctrl button.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23fff' viewBox='0 0 29 29'%3E%3Cpath d='M10 13c-.75 0-1.5.75-1.5 1.5S9.25 16 10 16h9c.75 0 1.5-.75 1.5-1.5S19.75 13 19 13z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23fff' viewBox='0 0 29 29'%3E%3Cpath d='M14.5 8.5c-.75 0-1.5.75-1.5 1.5v3h-3c-.75 0-1.5.75-1.5 1.5S9.25 16 10 16h3v3c0 .75.75 1.5 1.5 1.5S16 19.75 16 19v-3h3c.75 0 1.5-.75 1.5-1.5S19.75 13 19 13h-3v-3c0-.75-.75-1.5-1.5-1.5'/%3E%3C/svg%3E")}}@media (forced-colors:active) and (prefers-color-scheme:light){.maplibregl-ctrl button.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath d='M10 13c-.75 0-1.5.75-1.5 1.5S9.25 16 10 16h9c.75 0 1.5-.75 1.5-1.5S19.75 13 19 13z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath d='M14.5 8.5c-.75 0-1.5.75-1.5 1.5v3h-3c-.75 0-1.5.75-1.5 1.5S9.25 16 10 16h3v3c0 .75.75 1.5 1.5 1.5S16 19.75 16 19v-3h3c.75 0 1.5-.75 1.5-1.5S19.75 13 19 13h-3v-3c0-.75-.75-1.5-1.5-1.5'/%3E%3C/svg%3E")}}.maplibregl-ctrl button.maplibregl-ctrl-fullscreen .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23333' viewBox='0 0 29 29'%3E%3Cpath d='M24 16v5.5c0 1.75-.75 2.5-2.5 2.5H16v-1l3-1.5-4-5.5 1-1 5.5 4 1.5-3zM6 16l1.5 3 5.5-4 1 1-4 5.5 3 1.5v1H7.5C5.75 24 5 23.25 5 21.5V16zm7-11v1l-3 1.5 4 5.5-1 1-5.5-4L6 13H5V7.5C5 5.75 5.75 5 7.5 5zm11 2.5c0-1.75-.75-2.5-2.5-2.5H16v1l3 1.5-4 5.5 1 1 5.5-4 1.5 3h1z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-shrink .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath d='M18.5 16c-1.75 0-2.5.75-2.5 2.5V24h1l1.5-3 5.5 4 1-1-4-5.5 3-1.5v-1zM13 18.5c0-1.75-.75-2.5-2.5-2.5H5v1l3 1.5L4 24l1 1 5.5-4 1.5 3h1zm3-8c0 1.75.75 2.5 2.5 2.5H24v-1l-3-1.5L25 5l-1-1-5.5 4L17 5h-1zM10.5 13c1.75 0 2.5-.75 2.5-2.5V5h-1l-1.5 3L5 4 4 5l4 5.5L5 12v1z'/%3E%3C/svg%3E")}@media (forced-colors:active){.maplibregl-ctrl button.maplibregl-ctrl-fullscreen .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23fff' viewBox='0 0 29 29'%3E%3Cpath d='M24 16v5.5c0 1.75-.75 2.5-2.5 2.5H16v-1l3-1.5-4-5.5 1-1 5.5 4 1.5-3zM6 16l1.5 3 5.5-4 1 1-4 5.5 3 1.5v1H7.5C5.75 24 5 23.25 5 21.5V16zm7-11v1l-3 1.5 4 5.5-1 1-5.5-4L6 13H5V7.5C5 5.75 5.75 5 7.5 5zm11 2.5c0-1.75-.75-2.5-2.5-2.5H16v1l3 1.5-4 5.5 1 1 5.5-4 1.5 3h1z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-shrink .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23fff' viewBox='0 0 29 29'%3E%3Cpath d='M18.5 16c-1.75 0-2.5.75-2.5 2.5V24h1l1.5-3 5.5 4 1-1-4-5.5 3-1.5v-1zM13 18.5c0-1.75-.75-2.5-2.5-2.5H5v1l3 1.5L4 24l1 1 5.5-4 1.5 3h1zm3-8c0 1.75.75 2.5 2.5 2.5H24v-1l-3-1.5L25 5l-1-1-5.5 4L17 5h-1zM10.5 13c1.75 0 2.5-.75 2.5-2.5V5h-1l-1.5 3L5 4 4 5l4 5.5L5 12v1z'/%3E%3C/svg%3E")}}@media (forced-colors:active) and (prefers-color-scheme:light){.maplibregl-ctrl button.maplibregl-ctrl-fullscreen .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath d='M24 16v5.5c0 1.75-.75 2.5-2.5 2.5H16v-1l3-1.5-4-5.5 1-1 5.5 4 1.5-3zM6 16l1.5 3 5.5-4 1 1-4 5.5 3 1.5v1H7.5C5.75 24 5 23.25 5 21.5V16zm7-11v1l-3 1.5 4 5.5-1 1-5.5-4L6 13H5V7.5C5 5.75 5.75 5 7.5 5zm11 2.5c0-1.75-.75-2.5-2.5-2.5H16v1l3 1.5-4 5.5 1 1 5.5-4 1.5 3h1z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-shrink .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath d='M18.5 16c-1.75 0-2.5.75-2.5 2.5V24h1l1.5-3 5.5 4 1-1-4-5.5 3-1.5v-1zM13 18.5c0-1.75-.75-2.5-2.5-2.5H5v1l3 1.5L4 24l1 1 5.5-4 1.5 3h1zm3-8c0 1.75.75 2.5 2.5 2.5H24v-1l-3-1.5L25 5l-1-1-5.5 4L17 5h-1zM10.5 13c1.75 0 2.5-.75 2.5-2.5V5h-1l-1.5 3L5 4 4 5l4 5.5L5 12v1z'/%3E%3C/svg%3E")}}.maplibregl-ctrl button.maplibregl-ctrl-compass .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23333' viewBox='0 0 29 29'%3E%3Cpath d='m10.5 14 4-8 4 8z'/%3E%3Cpath fill='%23ccc' d='m10.5 16 4 8 4-8z'/%3E%3C/svg%3E")}@media (forced-colors:active){.maplibregl-ctrl button.maplibregl-ctrl-compass .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23fff' viewBox='0 0 29 29'%3E%3Cpath d='m10.5 14 4-8 4 8z'/%3E%3Cpath fill='%23ccc' d='m10.5 16 4 8 4-8z'/%3E%3C/svg%3E")}}@media (forced-colors:active) and (prefers-color-scheme:light){.maplibregl-ctrl button.maplibregl-ctrl-compass .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 29 29'%3E%3Cpath d='m10.5 14 4-8 4 8z'/%3E%3Cpath fill='%23ccc' d='m10.5 16 4 8 4-8z'/%3E%3C/svg%3E")}}.maplibregl-ctrl button.maplibregl-ctrl-terrain .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' fill='%23333' viewBox='0 0 22 22'%3E%3Cpath d='m1.754 13.406 4.453-4.851 3.09 3.09 3.281 3.277.969-.969-3.309-3.312 3.844-4.121 6.148 6.886h1.082v-.855l-7.207-8.07-4.84 5.187L6.169 6.57l-5.48 5.965v.871ZM.688 16.844h20.625v1.375H.688Zm0 0'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-terrain-enabled .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' fill='%2333b5e5' viewBox='0 0 22 22'%3E%3Cpath d='m1.754 13.406 4.453-4.851 3.09 3.09 3.281 3.277.969-.969-3.309-3.312 3.844-4.121 6.148 6.886h1.082v-.855l-7.207-8.07-4.84 5.187L6.169 6.57l-5.48 5.965v.871ZM.688 16.844h20.625v1.375H.688Zm0 0'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23333' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate:disabled .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23aaa' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3Cpath fill='red' d='m14 5 1 1-9 9-1-1z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-active .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%2333b5e5' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-active-error .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23e58978' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-background .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%2333b5e5' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-background-error .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23e54e33' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-waiting .maplibregl-ctrl-icon{animation:maplibregl-spin 2s linear infinite}@media (forced-colors:active){.maplibregl-ctrl button.maplibregl-ctrl-geolocate .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23fff' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate:disabled .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23999' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3Cpath fill='red' d='m14 5 1 1-9 9-1-1z'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-active .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%2333b5e5' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-active-error .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23e58978' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-background .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%2333b5e5' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-background-error .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23e54e33' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3C/svg%3E")}}@media (forced-colors:active) and (prefers-color-scheme:light){.maplibregl-ctrl button.maplibregl-ctrl-geolocate .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E")}.maplibregl-ctrl button.maplibregl-ctrl-geolocate:disabled .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%23666' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3Cpath fill='red' d='m14 5 1 1-9 9-1-1z'/%3E%3C/svg%3E")}}@keyframes maplibregl-spin{0%{transform:rotate(0deg)}to{transform:rotate(1turn)}}a.maplibregl-ctrl-logo{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='23' fill='none'%3E%3Cpath fill='%23000' fill-opacity='.4' fill-rule='evenodd' d='M17.408 16.796h-1.827l2.501-12.095h.198l3.324 6.533.988 2.19.988-2.19 3.258-6.533h.181l2.6 12.095h-1.81l-1.218-5.644-.362-1.71-.658 1.71-2.929 5.644h-.098l-2.914-5.644-.757-1.71-.345 1.71zm1.958-3.42-.726 3.663a1.255 1.255 0 0 1-1.232 1.011h-1.827a1.255 1.255 0 0 1-1.229-1.509l2.501-12.095a1.255 1.255 0 0 1 1.23-1.001h.197a1.25 1.25 0 0 1 1.12.685l3.19 6.273 3.125-6.263a1.25 1.25 0 0 1 1.123-.695h.181a1.255 1.255 0 0 1 1.227.991l1.443 6.71a5 5 0 0 1 .314-.787l.009-.016a4.6 4.6 0 0 1 1.777-1.887c.782-.46 1.668-.667 2.611-.667a4.6 4.6 0 0 1 1.7.32l.306.134c.21-.16.474-.256.759-.256h1.694a1.255 1.255 0 0 1 1.212.925 1.255 1.255 0 0 1 1.212-.925h1.711c.284 0 .545.094.755.252.613-.3 1.312-.45 2.075-.45 1.356 0 2.557.445 3.482 1.4q.47.48.763 1.064V4.701a1.255 1.255 0 0 1 1.255-1.255h1.86A1.255 1.255 0 0 1 54.44 4.7v9.194h2.217c.19 0 .37.043.532.118v-4.77c0-.356.147-.678.385-.906a2.42 2.42 0 0 1-.682-1.71c0-.665.267-1.253.735-1.7a2.45 2.45 0 0 1 1.722-.674 2.43 2.43 0 0 1 1.705.675q.318.302.504.683V4.7a1.255 1.255 0 0 1 1.255-1.255h1.744A1.255 1.255 0 0 1 65.812 4.7v3.335a4.8 4.8 0 0 1 1.526-.246c.938 0 1.817.214 2.59.69a4.47 4.47 0 0 1 1.67 1.743v-.98a1.255 1.255 0 0 1 1.256-1.256h1.777c.233 0 .451.064.639.174a3.4 3.4 0 0 1 1.567-.372c.346 0 .861.02 1.285.232a1.25 1.25 0 0 1 .689 1.004 4.7 4.7 0 0 1 .853-.588c.795-.44 1.675-.647 2.61-.647 1.385 0 2.65.39 3.525 1.396.836.938 1.168 2.173 1.168 3.528q-.001.515-.056 1.051a1.255 1.255 0 0 1-.947 1.09l.408.952a1.255 1.255 0 0 1-.477 1.552c-.418.268-.92.463-1.458.612-.613.171-1.304.244-2.049.244-1.06 0-2.043-.207-2.886-.698l-.015-.008c-.798-.48-1.419-1.135-1.818-1.963l-.004-.008a5.8 5.8 0 0 1-.548-2.512q0-.429.053-.843a1.3 1.3 0 0 1-.333-.086l-.166-.004c-.223 0-.426.062-.643.228-.03.024-.142.139-.142.59v3.883a1.255 1.255 0 0 1-1.256 1.256h-1.777a1.255 1.255 0 0 1-1.256-1.256V15.69l-.032.057a4.8 4.8 0 0 1-1.86 1.833 5.04 5.04 0 0 1-2.484.634 4.5 4.5 0 0 1-1.935-.424 1.25 1.25 0 0 1-.764.258h-1.71a1.255 1.255 0 0 1-1.256-1.255V7.687a2.4 2.4 0 0 1-.428.625c.253.23.412.561.412.93v7.553a1.255 1.255 0 0 1-1.256 1.255h-1.843a1.25 1.25 0 0 1-.894-.373c-.228.23-.544.373-.894.373H51.32a1.255 1.255 0 0 1-1.256-1.255v-1.251l-.061.117a4.7 4.7 0 0 1-1.782 1.884 4.77 4.77 0 0 1-2.485.67 5.6 5.6 0 0 1-1.485-.188l.009 2.764a1.255 1.255 0 0 1-1.255 1.259h-1.729a1.255 1.255 0 0 1-1.255-1.255v-3.537a1.255 1.255 0 0 1-1.167.793h-1.679a1.25 1.25 0 0 1-.77-.263 4.5 4.5 0 0 1-1.945.429c-.885 0-1.724-.21-2.495-.632l-.017-.01a5 5 0 0 1-1.081-.836 1.255 1.255 0 0 1-1.254 1.312h-1.81a1.255 1.255 0 0 1-1.228-.99l-.782-3.625-2.044 3.939a1.25 1.25 0 0 1-1.115.676h-.098a1.25 1.25 0 0 1-1.116-.68l-2.061-3.994zM35.92 16.63l.207-.114.223-.15q.493-.356.735-.785l.061-.118.033 1.332h1.678V9.242h-1.694l-.033 1.267q-.133-.329-.526-.658l-.032-.028a3.2 3.2 0 0 0-.668-.428l-.27-.12a3.3 3.3 0 0 0-1.235-.23q-1.136-.001-1.974.493a3.36 3.36 0 0 0-1.3 1.382q-.445.89-.444 2.074 0 1.2.51 2.107a3.8 3.8 0 0 0 1.382 1.381 3.9 3.9 0 0 0 1.893.477q.795 0 1.455-.33zm-2.789-5.38q-.576.675-.575 1.762 0 1.102.559 1.794.576.675 1.645.675a2.25 2.25 0 0 0 .934-.19 2.2 2.2 0 0 0 .468-.29l.178-.161a2.2 2.2 0 0 0 .397-.561q.244-.5.244-1.15v-.115q0-.708-.296-1.267l-.043-.077a2.2 2.2 0 0 0-.633-.709l-.13-.086-.047-.028a2.1 2.1 0 0 0-1.073-.285q-1.052 0-1.629.692zm2.316 2.706c.163-.17.28-.407.28-.83v-.114c0-.292-.06-.508-.15-.68a.96.96 0 0 0-.353-.389.85.85 0 0 0-.464-.127c-.4 0-.56.114-.664.239l-.01.012c-.148.174-.275.45-.275.945 0 .506.122.801.27.99.097.11.266.224.68.224.303 0 .504-.09.687-.269zm7.545 1.705a2.6 2.6 0 0 0 .331.423q.319.33.755.548l.173.074q.65.255 1.49.255 1.02 0 1.844-.493a3.45 3.45 0 0 0 1.316-1.4q.493-.904.493-2.089 0-1.909-.988-2.913-.988-1.02-2.584-1.02-.898 0-1.575.347a3 3 0 0 0-.415.262l-.199.166a3.4 3.4 0 0 0-.64.82V9.242h-1.712v11.553h1.729l-.017-5.134zm.53-1.138q.206.29.48.5l.155.11.053.034q.51.296 1.119.297 1.07 0 1.645-.675.577-.69.576-1.762 0-1.119-.576-1.777-.558-.675-1.645-.675-.435 0-.835.16a2 2 0 0 0-.284.136 2 2 0 0 0-.363.254 2.2 2.2 0 0 0-.46.569l-.082.162a2.6 2.6 0 0 0-.213 1.072v.115q0 .707.296 1.267l.135.211zm.964-.818a1.1 1.1 0 0 0 .367.385.94.94 0 0 0 .476.118c.423 0 .59-.117.687-.23.159-.194.28-.478.28-.95 0-.53-.133-.8-.266-.952l-.021-.025c-.078-.094-.231-.221-.68-.221a1 1 0 0 0-.503.135l-.012.007a.86.86 0 0 0-.335.343c-.073.133-.132.324-.132.614v.115a1.4 1.4 0 0 0 .14.66zm15.7-6.222q.347-.346.346-.856a1.05 1.05 0 0 0-.345-.79 1.18 1.18 0 0 0-.84-.329q-.51 0-.855.33a1.05 1.05 0 0 0-.346.79q0 .51.346.855.345.346.856.346.51 0 .839-.346zm4.337 9.314.033-1.332q.191.403.59.747l.098.081a4 4 0 0 0 .316.224l.223.122a3.2 3.2 0 0 0 1.44.322 3.8 3.8 0 0 0 1.875-.477 3.5 3.5 0 0 0 1.382-1.366q.527-.89.526-2.09 0-1.184-.444-2.073a3.24 3.24 0 0 0-1.283-1.399q-.823-.51-1.942-.51a3.5 3.5 0 0 0-1.527.344l-.086.043-.165.09a3 3 0 0 0-.33.214q-.432.315-.656.707a2 2 0 0 0-.099.198l.082-1.283V4.701h-1.744v12.095zm.473-2.509a2.5 2.5 0 0 0 .566.7q.117.098.245.18l.144.08a2.1 2.1 0 0 0 .975.232q1.07 0 1.645-.675.576-.69.576-1.778 0-1.102-.576-1.777-.56-.691-1.645-.692a2.2 2.2 0 0 0-1.015.235q-.22.113-.415.282l-.15.142a2.1 2.1 0 0 0-.42.594q-.223.479-.223 1.1v.115q0 .705.293 1.26zm2.616-.293c.157-.191.28-.479.28-.967 0-.51-.13-.79-.276-.961l-.021-.026c-.082-.1-.232-.225-.67-.225a.87.87 0 0 0-.681.279l-.012.011c-.154.155-.274.38-.274.807v.115c0 .285.057.499.144.669a1.1 1.1 0 0 0 .367.405c.137.082.28.123.455.123.423 0 .59-.118.686-.23zm8.266-3.013q.345-.13.724-.14l.069-.002q.493 0 .642.099l.247-1.794q-.196-.099-.717-.099a2.3 2.3 0 0 0-.545.063 2 2 0 0 0-.411.148 2.2 2.2 0 0 0-.4.249 2.5 2.5 0 0 0-.485.499 2.7 2.7 0 0 0-.32.581l-.05.137v-1.48h-1.778v7.553h1.777v-3.884q0-.546.159-.943a1.5 1.5 0 0 1 .466-.636 2.5 2.5 0 0 1 .399-.253 2 2 0 0 1 .224-.099zm9.784 2.656.05-.922q0-1.743-.856-2.698-.838-.97-2.584-.97-1.119-.001-2.007.493a3.46 3.46 0 0 0-1.4 1.382q-.493.906-.493 2.106 0 1.07.428 1.975.428.89 1.332 1.432.906.526 2.255.526.973 0 1.668-.185l.044-.012.135-.04q.613-.184.984-.421l-.542-1.267q-.3.162-.642.274l-.297.087q-.51.131-1.3.131-.954 0-1.497-.444a1.6 1.6 0 0 1-.192-.193q-.366-.44-.512-1.234l-.004-.021zm-5.427-1.256-.003.022h3.752v-.138q-.011-.727-.288-1.118a1 1 0 0 0-.156-.176q-.46-.428-1.316-.428-.986 0-1.494.604-.379.45-.494 1.234zm-27.053 2.77V4.7h-1.86v12.095h5.333V15.15zm7.103-5.908v7.553h-1.843V9.242h1.843z'/%3E%3Cpath fill='%23fff' d='m19.63 11.151-.757-1.71-.345 1.71-1.12 5.644h-1.827L18.083 4.7h.197l3.325 6.533.988 2.19.988-2.19L26.839 4.7h.181l2.6 12.095h-1.81l-1.218-5.644-.362-1.71-.658 1.71-2.93 5.644h-.098l-2.913-5.644zm14.836 5.81q-1.02 0-1.893-.478a3.8 3.8 0 0 1-1.381-1.382q-.51-.906-.51-2.106 0-1.185.444-2.074a3.36 3.36 0 0 1 1.3-1.382q.839-.494 1.974-.494a3.3 3.3 0 0 1 1.234.231 3.3 3.3 0 0 1 .97.575q.396.33.527.659l.033-1.267h1.694v7.553H37.18l-.033-1.332q-.279.593-1.02 1.053a3.17 3.17 0 0 1-1.662.444zm.296-1.482q.938 0 1.58-.642.642-.66.642-1.711v-.115q0-.708-.296-1.267a2.2 2.2 0 0 0-.807-.872 2.1 2.1 0 0 0-1.119-.313q-1.053 0-1.629.692-.575.675-.575 1.76 0 1.103.559 1.795.577.675 1.645.675zm6.521-6.237h1.711v1.4q.906-1.597 2.83-1.597 1.596 0 2.584 1.02.988 1.005.988 2.914 0 1.185-.493 2.09a3.46 3.46 0 0 1-1.316 1.399 3.5 3.5 0 0 1-1.844.493q-.954 0-1.662-.329a2.67 2.67 0 0 1-1.086-.97l.017 5.134h-1.728zm4.048 6.22q1.07 0 1.645-.674.577-.69.576-1.762 0-1.119-.576-1.777-.558-.675-1.645-.675-.592 0-1.12.296-.51.28-.822.823-.296.527-.296 1.234v.115q0 .708.296 1.267.313.543.823.855.51.296 1.119.297z'/%3E%3Cpath fill='%23e1e3e9' d='M51.325 4.7h1.86v10.45h3.473v1.646h-5.333zm7.12 4.542h1.843v7.553h-1.843zm.905-1.415a1.16 1.16 0 0 1-.856-.346 1.17 1.17 0 0 1-.346-.856 1.05 1.05 0 0 1 .346-.79q.346-.329.856-.329.494 0 .839.33a1.05 1.05 0 0 1 .345.79 1.16 1.16 0 0 1-.345.855q-.33.346-.84.346zm7.875 9.133a3.17 3.17 0 0 1-1.662-.444q-.723-.46-1.004-1.053l-.033 1.332h-1.71V4.701h1.743v4.657l-.082 1.283q.279-.658 1.086-1.119a3.5 3.5 0 0 1 1.778-.477q1.119 0 1.942.51a3.24 3.24 0 0 1 1.283 1.4q.445.888.444 2.072 0 1.201-.526 2.09a3.5 3.5 0 0 1-1.382 1.366 3.8 3.8 0 0 1-1.876.477zm-.296-1.481q1.069 0 1.645-.675.577-.69.577-1.778 0-1.102-.577-1.776-.56-.691-1.645-.692a2.12 2.12 0 0 0-1.58.659q-.642.641-.642 1.694v.115q0 .71.296 1.267a2.4 2.4 0 0 0 .807.872 2.1 2.1 0 0 0 1.119.313zm5.927-6.237h1.777v1.481q.263-.757.856-1.217a2.14 2.14 0 0 1 1.349-.46q.527 0 .724.098l-.247 1.794q-.149-.099-.642-.099-.774 0-1.416.494-.626.493-.626 1.58v3.883h-1.777V9.242zm9.534 7.718q-1.35 0-2.255-.526-.904-.543-1.332-1.432a4.6 4.6 0 0 1-.428-1.975q0-1.2.493-2.106a3.46 3.46 0 0 1 1.4-1.382q.889-.495 2.007-.494 1.744 0 2.584.97.855.956.856 2.7 0 .444-.05.92h-5.43q.18 1.005.708 1.45.542.443 1.497.443.79 0 1.3-.131a4 4 0 0 0 .938-.362l.542 1.267q-.411.263-1.119.46-.708.198-1.711.197zm1.596-4.558q.016-1.02-.444-1.432-.46-.428-1.316-.428-1.728 0-1.991 1.86z'/%3E%3Cpath d='M5.074 15.948a.484.657 0 0 0-.486.659v1.84a.484.657 0 0 0 .486.659h4.101a.484.657 0 0 0 .486-.659v-1.84a.484.657 0 0 0-.486-.659zm3.56 1.16H5.617v.838h3.017z' style='fill:%23fff;fill-rule:evenodd;stroke-width:1.03600001'/%3E%3Cg style='stroke-width:1.12603545'%3E%3Cpath d='M-9.408-1.416c-3.833-.025-7.056 2.912-7.08 6.615-.02 3.08 1.653 4.832 3.107 6.268.903.892 1.721 1.74 2.32 2.902l-.525-.004c-.543-.003-.992.304-1.24.639a1.87 1.87 0 0 0-.362 1.121l-.011 1.877c-.003.402.104.787.347 1.125.244.338.688.653 1.23.656l4.142.028c.542.003.99-.306 1.238-.641a1.87 1.87 0 0 0 .363-1.121l.012-1.875a1.87 1.87 0 0 0-.348-1.127c-.243-.338-.688-.653-1.23-.656l-.518-.004c.597-1.145 1.425-1.983 2.348-2.87 1.473-1.414 3.18-3.149 3.2-6.226-.016-3.59-2.923-6.684-6.993-6.707m-.006 1.1v.002c3.274.02 5.92 2.532 5.9 5.6-.017 2.706-1.39 4.026-2.863 5.44-1.034.994-2.118 2.033-2.814 3.633-.018.041-.052.055-.075.065q-.013.004-.02.01a.34.34 0 0 1-.226.084.34.34 0 0 1-.224-.086l-.092-.077c-.699-1.615-1.768-2.669-2.781-3.67-1.454-1.435-2.797-2.762-2.78-5.478.02-3.067 2.7-5.545 5.975-5.523m-.02 2.826c-1.62-.01-2.944 1.315-2.955 2.96-.01 1.646 1.295 2.988 2.916 2.999h.002c1.621.01 2.943-1.316 2.953-2.961.011-1.646-1.294-2.988-2.916-2.998m-.005 1.1c1.017.006 1.829.83 1.822 1.89s-.83 1.874-1.848 1.867c-1.018-.006-1.829-.83-1.822-1.89s.83-1.874 1.848-1.868m-2.155 11.857 4.14.025c.271.002.49.305.487.676l-.013 1.875c-.003.37-.224.67-.495.668l-4.14-.025c-.27-.002-.487-.306-.485-.676l.012-1.875c.003-.37.224-.67.494-.668' style='color:%23000;font-style:normal;font-variant:normal;font-weight:400;font-stretch:normal;font-size:medium;line-height:normal;font-family:sans-serif;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:%23000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:start;white-space:normal;shape-padding:0;clip-rule:evenodd;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:%23000;solid-opacity:1;vector-effect:none;fill:%23000;fill-opacity:.4;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto' transform='translate(15.553 2.85)scale(.88807)'/%3E%3Cpath d='M-9.415-.316C-12.69-.338-15.37 2.14-15.39 5.207c-.017 2.716 1.326 4.041 2.78 5.477 1.013 1 2.081 2.055 2.78 3.67l.092.076a.34.34 0 0 0 .225.086.34.34 0 0 0 .227-.083l.019-.01c.022-.009.057-.024.074-.064.697-1.6 1.78-2.64 2.814-3.634 1.473-1.414 2.847-2.733 2.864-5.44.02-3.067-2.627-5.58-5.901-5.601m-.057 8.784c1.621.011 2.944-1.315 2.955-2.96.01-1.646-1.295-2.988-2.916-2.999-1.622-.01-2.945 1.315-2.955 2.96s1.295 2.989 2.916 3' style='clip-rule:evenodd;fill:%23e1e3e9;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:.4' transform='translate(15.553 2.85)scale(.88807)'/%3E%3Cpath d='M-11.594 15.465c-.27-.002-.492.297-.494.668l-.012 1.876c-.003.371.214.673.485.675l4.14.027c.271.002.492-.298.495-.668l.012-1.877c.003-.37-.215-.672-.485-.674z' style='clip-rule:evenodd;fill:%23fff;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:.4' transform='translate(15.553 2.85)scale(.88807)'/%3E%3C/g%3E%3C/svg%3E");background-repeat:no-repeat;cursor:pointer;display:block;height:23px;margin:0 0 -4px -4px;overflow:hidden;width:88px}a.maplibregl-ctrl-logo.maplibregl-compact{width:14px}@media (forced-colors:active){a.maplibregl-ctrl-logo{background-color:transparent;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='23' fill='none'%3E%3Cpath fill='%23000' fill-opacity='.4' fill-rule='evenodd' d='M17.408 16.796h-1.827l2.501-12.095h.198l3.324 6.533.988 2.19.988-2.19 3.258-6.533h.181l2.6 12.095h-1.81l-1.218-5.644-.362-1.71-.658 1.71-2.929 5.644h-.098l-2.914-5.644-.757-1.71-.345 1.71zm1.958-3.42-.726 3.663a1.255 1.255 0 0 1-1.232 1.011h-1.827a1.255 1.255 0 0 1-1.229-1.509l2.501-12.095a1.255 1.255 0 0 1 1.23-1.001h.197a1.25 1.25 0 0 1 1.12.685l3.19 6.273 3.125-6.263a1.25 1.25 0 0 1 1.123-.695h.181a1.255 1.255 0 0 1 1.227.991l1.443 6.71a5 5 0 0 1 .314-.787l.009-.016a4.6 4.6 0 0 1 1.777-1.887c.782-.46 1.668-.667 2.611-.667a4.6 4.6 0 0 1 1.7.32l.306.134c.21-.16.474-.256.759-.256h1.694a1.255 1.255 0 0 1 1.212.925 1.255 1.255 0 0 1 1.212-.925h1.711c.284 0 .545.094.755.252.613-.3 1.312-.45 2.075-.45 1.356 0 2.557.445 3.482 1.4q.47.48.763 1.064V4.701a1.255 1.255 0 0 1 1.255-1.255h1.86A1.255 1.255 0 0 1 54.44 4.7v9.194h2.217c.19 0 .37.043.532.118v-4.77c0-.356.147-.678.385-.906a2.42 2.42 0 0 1-.682-1.71c0-.665.267-1.253.735-1.7a2.45 2.45 0 0 1 1.722-.674 2.43 2.43 0 0 1 1.705.675q.318.302.504.683V4.7a1.255 1.255 0 0 1 1.255-1.255h1.744A1.255 1.255 0 0 1 65.812 4.7v3.335a4.8 4.8 0 0 1 1.526-.246c.938 0 1.817.214 2.59.69a4.47 4.47 0 0 1 1.67 1.743v-.98a1.255 1.255 0 0 1 1.256-1.256h1.777c.233 0 .451.064.639.174a3.4 3.4 0 0 1 1.567-.372c.346 0 .861.02 1.285.232a1.25 1.25 0 0 1 .689 1.004 4.7 4.7 0 0 1 .853-.588c.795-.44 1.675-.647 2.61-.647 1.385 0 2.65.39 3.525 1.396.836.938 1.168 2.173 1.168 3.528q-.001.515-.056 1.051a1.255 1.255 0 0 1-.947 1.09l.408.952a1.255 1.255 0 0 1-.477 1.552c-.418.268-.92.463-1.458.612-.613.171-1.304.244-2.049.244-1.06 0-2.043-.207-2.886-.698l-.015-.008c-.798-.48-1.419-1.135-1.818-1.963l-.004-.008a5.8 5.8 0 0 1-.548-2.512q0-.429.053-.843a1.3 1.3 0 0 1-.333-.086l-.166-.004c-.223 0-.426.062-.643.228-.03.024-.142.139-.142.59v3.883a1.255 1.255 0 0 1-1.256 1.256h-1.777a1.255 1.255 0 0 1-1.256-1.256V15.69l-.032.057a4.8 4.8 0 0 1-1.86 1.833 5.04 5.04 0 0 1-2.484.634 4.5 4.5 0 0 1-1.935-.424 1.25 1.25 0 0 1-.764.258h-1.71a1.255 1.255 0 0 1-1.256-1.255V7.687a2.4 2.4 0 0 1-.428.625c.253.23.412.561.412.93v7.553a1.255 1.255 0 0 1-1.256 1.255h-1.843a1.25 1.25 0 0 1-.894-.373c-.228.23-.544.373-.894.373H51.32a1.255 1.255 0 0 1-1.256-1.255v-1.251l-.061.117a4.7 4.7 0 0 1-1.782 1.884 4.77 4.77 0 0 1-2.485.67 5.6 5.6 0 0 1-1.485-.188l.009 2.764a1.255 1.255 0 0 1-1.255 1.259h-1.729a1.255 1.255 0 0 1-1.255-1.255v-3.537a1.255 1.255 0 0 1-1.167.793h-1.679a1.25 1.25 0 0 1-.77-.263 4.5 4.5 0 0 1-1.945.429c-.885 0-1.724-.21-2.495-.632l-.017-.01a5 5 0 0 1-1.081-.836 1.255 1.255 0 0 1-1.254 1.312h-1.81a1.255 1.255 0 0 1-1.228-.99l-.782-3.625-2.044 3.939a1.25 1.25 0 0 1-1.115.676h-.098a1.25 1.25 0 0 1-1.116-.68l-2.061-3.994zM35.92 16.63l.207-.114.223-.15q.493-.356.735-.785l.061-.118.033 1.332h1.678V9.242h-1.694l-.033 1.267q-.133-.329-.526-.658l-.032-.028a3.2 3.2 0 0 0-.668-.428l-.27-.12a3.3 3.3 0 0 0-1.235-.23q-1.136-.001-1.974.493a3.36 3.36 0 0 0-1.3 1.382q-.445.89-.444 2.074 0 1.2.51 2.107a3.8 3.8 0 0 0 1.382 1.381 3.9 3.9 0 0 0 1.893.477q.795 0 1.455-.33zm-2.789-5.38q-.576.675-.575 1.762 0 1.102.559 1.794.576.675 1.645.675a2.25 2.25 0 0 0 .934-.19 2.2 2.2 0 0 0 .468-.29l.178-.161a2.2 2.2 0 0 0 .397-.561q.244-.5.244-1.15v-.115q0-.708-.296-1.267l-.043-.077a2.2 2.2 0 0 0-.633-.709l-.13-.086-.047-.028a2.1 2.1 0 0 0-1.073-.285q-1.052 0-1.629.692zm2.316 2.706c.163-.17.28-.407.28-.83v-.114c0-.292-.06-.508-.15-.68a.96.96 0 0 0-.353-.389.85.85 0 0 0-.464-.127c-.4 0-.56.114-.664.239l-.01.012c-.148.174-.275.45-.275.945 0 .506.122.801.27.99.097.11.266.224.68.224.303 0 .504-.09.687-.269zm7.545 1.705a2.6 2.6 0 0 0 .331.423q.319.33.755.548l.173.074q.65.255 1.49.255 1.02 0 1.844-.493a3.45 3.45 0 0 0 1.316-1.4q.493-.904.493-2.089 0-1.909-.988-2.913-.988-1.02-2.584-1.02-.898 0-1.575.347a3 3 0 0 0-.415.262l-.199.166a3.4 3.4 0 0 0-.64.82V9.242h-1.712v11.553h1.729l-.017-5.134zm.53-1.138q.206.29.48.5l.155.11.053.034q.51.296 1.119.297 1.07 0 1.645-.675.577-.69.576-1.762 0-1.119-.576-1.777-.558-.675-1.645-.675-.435 0-.835.16a2 2 0 0 0-.284.136 2 2 0 0 0-.363.254 2.2 2.2 0 0 0-.46.569l-.082.162a2.6 2.6 0 0 0-.213 1.072v.115q0 .707.296 1.267l.135.211zm.964-.818a1.1 1.1 0 0 0 .367.385.94.94 0 0 0 .476.118c.423 0 .59-.117.687-.23.159-.194.28-.478.28-.95 0-.53-.133-.8-.266-.952l-.021-.025c-.078-.094-.231-.221-.68-.221a1 1 0 0 0-.503.135l-.012.007a.86.86 0 0 0-.335.343c-.073.133-.132.324-.132.614v.115a1.4 1.4 0 0 0 .14.66zm15.7-6.222q.347-.346.346-.856a1.05 1.05 0 0 0-.345-.79 1.18 1.18 0 0 0-.84-.329q-.51 0-.855.33a1.05 1.05 0 0 0-.346.79q0 .51.346.855.345.346.856.346.51 0 .839-.346zm4.337 9.314.033-1.332q.191.403.59.747l.098.081a4 4 0 0 0 .316.224l.223.122a3.2 3.2 0 0 0 1.44.322 3.8 3.8 0 0 0 1.875-.477 3.5 3.5 0 0 0 1.382-1.366q.527-.89.526-2.09 0-1.184-.444-2.073a3.24 3.24 0 0 0-1.283-1.399q-.823-.51-1.942-.51a3.5 3.5 0 0 0-1.527.344l-.086.043-.165.09a3 3 0 0 0-.33.214q-.432.315-.656.707a2 2 0 0 0-.099.198l.082-1.283V4.701h-1.744v12.095zm.473-2.509a2.5 2.5 0 0 0 .566.7q.117.098.245.18l.144.08a2.1 2.1 0 0 0 .975.232q1.07 0 1.645-.675.576-.69.576-1.778 0-1.102-.576-1.777-.56-.691-1.645-.692a2.2 2.2 0 0 0-1.015.235q-.22.113-.415.282l-.15.142a2.1 2.1 0 0 0-.42.594q-.223.479-.223 1.1v.115q0 .705.293 1.26zm2.616-.293c.157-.191.28-.479.28-.967 0-.51-.13-.79-.276-.961l-.021-.026c-.082-.1-.232-.225-.67-.225a.87.87 0 0 0-.681.279l-.012.011c-.154.155-.274.38-.274.807v.115c0 .285.057.499.144.669a1.1 1.1 0 0 0 .367.405c.137.082.28.123.455.123.423 0 .59-.118.686-.23zm8.266-3.013q.345-.13.724-.14l.069-.002q.493 0 .642.099l.247-1.794q-.196-.099-.717-.099a2.3 2.3 0 0 0-.545.063 2 2 0 0 0-.411.148 2.2 2.2 0 0 0-.4.249 2.5 2.5 0 0 0-.485.499 2.7 2.7 0 0 0-.32.581l-.05.137v-1.48h-1.778v7.553h1.777v-3.884q0-.546.159-.943a1.5 1.5 0 0 1 .466-.636 2.5 2.5 0 0 1 .399-.253 2 2 0 0 1 .224-.099zm9.784 2.656.05-.922q0-1.743-.856-2.698-.838-.97-2.584-.97-1.119-.001-2.007.493a3.46 3.46 0 0 0-1.4 1.382q-.493.906-.493 2.106 0 1.07.428 1.975.428.89 1.332 1.432.906.526 2.255.526.973 0 1.668-.185l.044-.012.135-.04q.613-.184.984-.421l-.542-1.267q-.3.162-.642.274l-.297.087q-.51.131-1.3.131-.954 0-1.497-.444a1.6 1.6 0 0 1-.192-.193q-.366-.44-.512-1.234l-.004-.021zm-5.427-1.256-.003.022h3.752v-.138q-.011-.727-.288-1.118a1 1 0 0 0-.156-.176q-.46-.428-1.316-.428-.986 0-1.494.604-.379.45-.494 1.234zm-27.053 2.77V4.7h-1.86v12.095h5.333V15.15zm7.103-5.908v7.553h-1.843V9.242h1.843z'/%3E%3Cpath fill='%23fff' d='m19.63 11.151-.757-1.71-.345 1.71-1.12 5.644h-1.827L18.083 4.7h.197l3.325 6.533.988 2.19.988-2.19L26.839 4.7h.181l2.6 12.095h-1.81l-1.218-5.644-.362-1.71-.658 1.71-2.93 5.644h-.098l-2.913-5.644zm14.836 5.81q-1.02 0-1.893-.478a3.8 3.8 0 0 1-1.381-1.382q-.51-.906-.51-2.106 0-1.185.444-2.074a3.36 3.36 0 0 1 1.3-1.382q.839-.494 1.974-.494a3.3 3.3 0 0 1 1.234.231 3.3 3.3 0 0 1 .97.575q.396.33.527.659l.033-1.267h1.694v7.553H37.18l-.033-1.332q-.279.593-1.02 1.053a3.17 3.17 0 0 1-1.662.444zm.296-1.482q.938 0 1.58-.642.642-.66.642-1.711v-.115q0-.708-.296-1.267a2.2 2.2 0 0 0-.807-.872 2.1 2.1 0 0 0-1.119-.313q-1.053 0-1.629.692-.575.675-.575 1.76 0 1.103.559 1.795.577.675 1.645.675zm6.521-6.237h1.711v1.4q.906-1.597 2.83-1.597 1.596 0 2.584 1.02.988 1.005.988 2.914 0 1.185-.493 2.09a3.46 3.46 0 0 1-1.316 1.399 3.5 3.5 0 0 1-1.844.493q-.954 0-1.662-.329a2.67 2.67 0 0 1-1.086-.97l.017 5.134h-1.728zm4.048 6.22q1.07 0 1.645-.674.577-.69.576-1.762 0-1.119-.576-1.777-.558-.675-1.645-.675-.592 0-1.12.296-.51.28-.822.823-.296.527-.296 1.234v.115q0 .708.296 1.267.313.543.823.855.51.296 1.119.297z'/%3E%3Cpath fill='%23e1e3e9' d='M51.325 4.7h1.86v10.45h3.473v1.646h-5.333zm7.12 4.542h1.843v7.553h-1.843zm.905-1.415a1.16 1.16 0 0 1-.856-.346 1.17 1.17 0 0 1-.346-.856 1.05 1.05 0 0 1 .346-.79q.346-.329.856-.329.494 0 .839.33a1.05 1.05 0 0 1 .345.79 1.16 1.16 0 0 1-.345.855q-.33.346-.84.346zm7.875 9.133a3.17 3.17 0 0 1-1.662-.444q-.723-.46-1.004-1.053l-.033 1.332h-1.71V4.701h1.743v4.657l-.082 1.283q.279-.658 1.086-1.119a3.5 3.5 0 0 1 1.778-.477q1.119 0 1.942.51a3.24 3.24 0 0 1 1.283 1.4q.445.888.444 2.072 0 1.201-.526 2.09a3.5 3.5 0 0 1-1.382 1.366 3.8 3.8 0 0 1-1.876.477zm-.296-1.481q1.069 0 1.645-.675.577-.69.577-1.778 0-1.102-.577-1.776-.56-.691-1.645-.692a2.12 2.12 0 0 0-1.58.659q-.642.641-.642 1.694v.115q0 .71.296 1.267a2.4 2.4 0 0 0 .807.872 2.1 2.1 0 0 0 1.119.313zm5.927-6.237h1.777v1.481q.263-.757.856-1.217a2.14 2.14 0 0 1 1.349-.46q.527 0 .724.098l-.247 1.794q-.149-.099-.642-.099-.774 0-1.416.494-.626.493-.626 1.58v3.883h-1.777V9.242zm9.534 7.718q-1.35 0-2.255-.526-.904-.543-1.332-1.432a4.6 4.6 0 0 1-.428-1.975q0-1.2.493-2.106a3.46 3.46 0 0 1 1.4-1.382q.889-.495 2.007-.494 1.744 0 2.584.97.855.956.856 2.7 0 .444-.05.92h-5.43q.18 1.005.708 1.45.542.443 1.497.443.79 0 1.3-.131a4 4 0 0 0 .938-.362l.542 1.267q-.411.263-1.119.46-.708.198-1.711.197zm1.596-4.558q.016-1.02-.444-1.432-.46-.428-1.316-.428-1.728 0-1.991 1.86z'/%3E%3Cpath d='M5.074 15.948a.484.657 0 0 0-.486.659v1.84a.484.657 0 0 0 .486.659h4.101a.484.657 0 0 0 .486-.659v-1.84a.484.657 0 0 0-.486-.659zm3.56 1.16H5.617v.838h3.017z' style='fill:%23fff;fill-rule:evenodd;stroke-width:1.03600001'/%3E%3Cg style='stroke-width:1.12603545'%3E%3Cpath d='M-9.408-1.416c-3.833-.025-7.056 2.912-7.08 6.615-.02 3.08 1.653 4.832 3.107 6.268.903.892 1.721 1.74 2.32 2.902l-.525-.004c-.543-.003-.992.304-1.24.639a1.87 1.87 0 0 0-.362 1.121l-.011 1.877c-.003.402.104.787.347 1.125.244.338.688.653 1.23.656l4.142.028c.542.003.99-.306 1.238-.641a1.87 1.87 0 0 0 .363-1.121l.012-1.875a1.87 1.87 0 0 0-.348-1.127c-.243-.338-.688-.653-1.23-.656l-.518-.004c.597-1.145 1.425-1.983 2.348-2.87 1.473-1.414 3.18-3.149 3.2-6.226-.016-3.59-2.923-6.684-6.993-6.707m-.006 1.1v.002c3.274.02 5.92 2.532 5.9 5.6-.017 2.706-1.39 4.026-2.863 5.44-1.034.994-2.118 2.033-2.814 3.633-.018.041-.052.055-.075.065q-.013.004-.02.01a.34.34 0 0 1-.226.084.34.34 0 0 1-.224-.086l-.092-.077c-.699-1.615-1.768-2.669-2.781-3.67-1.454-1.435-2.797-2.762-2.78-5.478.02-3.067 2.7-5.545 5.975-5.523m-.02 2.826c-1.62-.01-2.944 1.315-2.955 2.96-.01 1.646 1.295 2.988 2.916 2.999h.002c1.621.01 2.943-1.316 2.953-2.961.011-1.646-1.294-2.988-2.916-2.998m-.005 1.1c1.017.006 1.829.83 1.822 1.89s-.83 1.874-1.848 1.867c-1.018-.006-1.829-.83-1.822-1.89s.83-1.874 1.848-1.868m-2.155 11.857 4.14.025c.271.002.49.305.487.676l-.013 1.875c-.003.37-.224.67-.495.668l-4.14-.025c-.27-.002-.487-.306-.485-.676l.012-1.875c.003-.37.224-.67.494-.668' style='color:%23000;font-style:normal;font-variant:normal;font-weight:400;font-stretch:normal;font-size:medium;line-height:normal;font-family:sans-serif;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:%23000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:start;white-space:normal;shape-padding:0;clip-rule:evenodd;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:%23000;solid-opacity:1;vector-effect:none;fill:%23000;fill-opacity:.4;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto' transform='translate(15.553 2.85)scale(.88807)'/%3E%3Cpath d='M-9.415-.316C-12.69-.338-15.37 2.14-15.39 5.207c-.017 2.716 1.326 4.041 2.78 5.477 1.013 1 2.081 2.055 2.78 3.67l.092.076a.34.34 0 0 0 .225.086.34.34 0 0 0 .227-.083l.019-.01c.022-.009.057-.024.074-.064.697-1.6 1.78-2.64 2.814-3.634 1.473-1.414 2.847-2.733 2.864-5.44.02-3.067-2.627-5.58-5.901-5.601m-.057 8.784c1.621.011 2.944-1.315 2.955-2.96.01-1.646-1.295-2.988-2.916-2.999-1.622-.01-2.945 1.315-2.955 2.96s1.295 2.989 2.916 3' style='clip-rule:evenodd;fill:%23e1e3e9;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:.4' transform='translate(15.553 2.85)scale(.88807)'/%3E%3Cpath d='M-11.594 15.465c-.27-.002-.492.297-.494.668l-.012 1.876c-.003.371.214.673.485.675l4.14.027c.271.002.492-.298.495-.668l.012-1.877c.003-.37-.215-.672-.485-.674z' style='clip-rule:evenodd;fill:%23fff;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:.4' transform='translate(15.553 2.85)scale(.88807)'/%3E%3C/g%3E%3C/svg%3E")}}@media (forced-colors:active) and (prefers-color-scheme:light){a.maplibregl-ctrl-logo{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='23' fill='none'%3E%3Cpath fill='%23000' fill-opacity='.4' fill-rule='evenodd' d='M17.408 16.796h-1.827l2.501-12.095h.198l3.324 6.533.988 2.19.988-2.19 3.258-6.533h.181l2.6 12.095h-1.81l-1.218-5.644-.362-1.71-.658 1.71-2.929 5.644h-.098l-2.914-5.644-.757-1.71-.345 1.71zm1.958-3.42-.726 3.663a1.255 1.255 0 0 1-1.232 1.011h-1.827a1.255 1.255 0 0 1-1.229-1.509l2.501-12.095a1.255 1.255 0 0 1 1.23-1.001h.197a1.25 1.25 0 0 1 1.12.685l3.19 6.273 3.125-6.263a1.25 1.25 0 0 1 1.123-.695h.181a1.255 1.255 0 0 1 1.227.991l1.443 6.71a5 5 0 0 1 .314-.787l.009-.016a4.6 4.6 0 0 1 1.777-1.887c.782-.46 1.668-.667 2.611-.667a4.6 4.6 0 0 1 1.7.32l.306.134c.21-.16.474-.256.759-.256h1.694a1.255 1.255 0 0 1 1.212.925 1.255 1.255 0 0 1 1.212-.925h1.711c.284 0 .545.094.755.252.613-.3 1.312-.45 2.075-.45 1.356 0 2.557.445 3.482 1.4q.47.48.763 1.064V4.701a1.255 1.255 0 0 1 1.255-1.255h1.86A1.255 1.255 0 0 1 54.44 4.7v9.194h2.217c.19 0 .37.043.532.118v-4.77c0-.356.147-.678.385-.906a2.42 2.42 0 0 1-.682-1.71c0-.665.267-1.253.735-1.7a2.45 2.45 0 0 1 1.722-.674 2.43 2.43 0 0 1 1.705.675q.318.302.504.683V4.7a1.255 1.255 0 0 1 1.255-1.255h1.744A1.255 1.255 0 0 1 65.812 4.7v3.335a4.8 4.8 0 0 1 1.526-.246c.938 0 1.817.214 2.59.69a4.47 4.47 0 0 1 1.67 1.743v-.98a1.255 1.255 0 0 1 1.256-1.256h1.777c.233 0 .451.064.639.174a3.4 3.4 0 0 1 1.567-.372c.346 0 .861.02 1.285.232a1.25 1.25 0 0 1 .689 1.004 4.7 4.7 0 0 1 .853-.588c.795-.44 1.675-.647 2.61-.647 1.385 0 2.65.39 3.525 1.396.836.938 1.168 2.173 1.168 3.528q-.001.515-.056 1.051a1.255 1.255 0 0 1-.947 1.09l.408.952a1.255 1.255 0 0 1-.477 1.552c-.418.268-.92.463-1.458.612-.613.171-1.304.244-2.049.244-1.06 0-2.043-.207-2.886-.698l-.015-.008c-.798-.48-1.419-1.135-1.818-1.963l-.004-.008a5.8 5.8 0 0 1-.548-2.512q0-.429.053-.843a1.3 1.3 0 0 1-.333-.086l-.166-.004c-.223 0-.426.062-.643.228-.03.024-.142.139-.142.59v3.883a1.255 1.255 0 0 1-1.256 1.256h-1.777a1.255 1.255 0 0 1-1.256-1.256V15.69l-.032.057a4.8 4.8 0 0 1-1.86 1.833 5.04 5.04 0 0 1-2.484.634 4.5 4.5 0 0 1-1.935-.424 1.25 1.25 0 0 1-.764.258h-1.71a1.255 1.255 0 0 1-1.256-1.255V7.687a2.4 2.4 0 0 1-.428.625c.253.23.412.561.412.93v7.553a1.255 1.255 0 0 1-1.256 1.255h-1.843a1.25 1.25 0 0 1-.894-.373c-.228.23-.544.373-.894.373H51.32a1.255 1.255 0 0 1-1.256-1.255v-1.251l-.061.117a4.7 4.7 0 0 1-1.782 1.884 4.77 4.77 0 0 1-2.485.67 5.6 5.6 0 0 1-1.485-.188l.009 2.764a1.255 1.255 0 0 1-1.255 1.259h-1.729a1.255 1.255 0 0 1-1.255-1.255v-3.537a1.255 1.255 0 0 1-1.167.793h-1.679a1.25 1.25 0 0 1-.77-.263 4.5 4.5 0 0 1-1.945.429c-.885 0-1.724-.21-2.495-.632l-.017-.01a5 5 0 0 1-1.081-.836 1.255 1.255 0 0 1-1.254 1.312h-1.81a1.255 1.255 0 0 1-1.228-.99l-.782-3.625-2.044 3.939a1.25 1.25 0 0 1-1.115.676h-.098a1.25 1.25 0 0 1-1.116-.68l-2.061-3.994zM35.92 16.63l.207-.114.223-.15q.493-.356.735-.785l.061-.118.033 1.332h1.678V9.242h-1.694l-.033 1.267q-.133-.329-.526-.658l-.032-.028a3.2 3.2 0 0 0-.668-.428l-.27-.12a3.3 3.3 0 0 0-1.235-.23q-1.136-.001-1.974.493a3.36 3.36 0 0 0-1.3 1.382q-.445.89-.444 2.074 0 1.2.51 2.107a3.8 3.8 0 0 0 1.382 1.381 3.9 3.9 0 0 0 1.893.477q.795 0 1.455-.33zm-2.789-5.38q-.576.675-.575 1.762 0 1.102.559 1.794.576.675 1.645.675a2.25 2.25 0 0 0 .934-.19 2.2 2.2 0 0 0 .468-.29l.178-.161a2.2 2.2 0 0 0 .397-.561q.244-.5.244-1.15v-.115q0-.708-.296-1.267l-.043-.077a2.2 2.2 0 0 0-.633-.709l-.13-.086-.047-.028a2.1 2.1 0 0 0-1.073-.285q-1.052 0-1.629.692zm2.316 2.706c.163-.17.28-.407.28-.83v-.114c0-.292-.06-.508-.15-.68a.96.96 0 0 0-.353-.389.85.85 0 0 0-.464-.127c-.4 0-.56.114-.664.239l-.01.012c-.148.174-.275.45-.275.945 0 .506.122.801.27.99.097.11.266.224.68.224.303 0 .504-.09.687-.269zm7.545 1.705a2.6 2.6 0 0 0 .331.423q.319.33.755.548l.173.074q.65.255 1.49.255 1.02 0 1.844-.493a3.45 3.45 0 0 0 1.316-1.4q.493-.904.493-2.089 0-1.909-.988-2.913-.988-1.02-2.584-1.02-.898 0-1.575.347a3 3 0 0 0-.415.262l-.199.166a3.4 3.4 0 0 0-.64.82V9.242h-1.712v11.553h1.729l-.017-5.134zm.53-1.138q.206.29.48.5l.155.11.053.034q.51.296 1.119.297 1.07 0 1.645-.675.577-.69.576-1.762 0-1.119-.576-1.777-.558-.675-1.645-.675-.435 0-.835.16a2 2 0 0 0-.284.136 2 2 0 0 0-.363.254 2.2 2.2 0 0 0-.46.569l-.082.162a2.6 2.6 0 0 0-.213 1.072v.115q0 .707.296 1.267l.135.211zm.964-.818a1.1 1.1 0 0 0 .367.385.94.94 0 0 0 .476.118c.423 0 .59-.117.687-.23.159-.194.28-.478.28-.95 0-.53-.133-.8-.266-.952l-.021-.025c-.078-.094-.231-.221-.68-.221a1 1 0 0 0-.503.135l-.012.007a.86.86 0 0 0-.335.343c-.073.133-.132.324-.132.614v.115a1.4 1.4 0 0 0 .14.66zm15.7-6.222q.347-.346.346-.856a1.05 1.05 0 0 0-.345-.79 1.18 1.18 0 0 0-.84-.329q-.51 0-.855.33a1.05 1.05 0 0 0-.346.79q0 .51.346.855.345.346.856.346.51 0 .839-.346zm4.337 9.314.033-1.332q.191.403.59.747l.098.081a4 4 0 0 0 .316.224l.223.122a3.2 3.2 0 0 0 1.44.322 3.8 3.8 0 0 0 1.875-.477 3.5 3.5 0 0 0 1.382-1.366q.527-.89.526-2.09 0-1.184-.444-2.073a3.24 3.24 0 0 0-1.283-1.399q-.823-.51-1.942-.51a3.5 3.5 0 0 0-1.527.344l-.086.043-.165.09a3 3 0 0 0-.33.214q-.432.315-.656.707a2 2 0 0 0-.099.198l.082-1.283V4.701h-1.744v12.095zm.473-2.509a2.5 2.5 0 0 0 .566.7q.117.098.245.18l.144.08a2.1 2.1 0 0 0 .975.232q1.07 0 1.645-.675.576-.69.576-1.778 0-1.102-.576-1.777-.56-.691-1.645-.692a2.2 2.2 0 0 0-1.015.235q-.22.113-.415.282l-.15.142a2.1 2.1 0 0 0-.42.594q-.223.479-.223 1.1v.115q0 .705.293 1.26zm2.616-.293c.157-.191.28-.479.28-.967 0-.51-.13-.79-.276-.961l-.021-.026c-.082-.1-.232-.225-.67-.225a.87.87 0 0 0-.681.279l-.012.011c-.154.155-.274.38-.274.807v.115c0 .285.057.499.144.669a1.1 1.1 0 0 0 .367.405c.137.082.28.123.455.123.423 0 .59-.118.686-.23zm8.266-3.013q.345-.13.724-.14l.069-.002q.493 0 .642.099l.247-1.794q-.196-.099-.717-.099a2.3 2.3 0 0 0-.545.063 2 2 0 0 0-.411.148 2.2 2.2 0 0 0-.4.249 2.5 2.5 0 0 0-.485.499 2.7 2.7 0 0 0-.32.581l-.05.137v-1.48h-1.778v7.553h1.777v-3.884q0-.546.159-.943a1.5 1.5 0 0 1 .466-.636 2.5 2.5 0 0 1 .399-.253 2 2 0 0 1 .224-.099zm9.784 2.656.05-.922q0-1.743-.856-2.698-.838-.97-2.584-.97-1.119-.001-2.007.493a3.46 3.46 0 0 0-1.4 1.382q-.493.906-.493 2.106 0 1.07.428 1.975.428.89 1.332 1.432.906.526 2.255.526.973 0 1.668-.185l.044-.012.135-.04q.613-.184.984-.421l-.542-1.267q-.3.162-.642.274l-.297.087q-.51.131-1.3.131-.954 0-1.497-.444a1.6 1.6 0 0 1-.192-.193q-.366-.44-.512-1.234l-.004-.021zm-5.427-1.256-.003.022h3.752v-.138q-.011-.727-.288-1.118a1 1 0 0 0-.156-.176q-.46-.428-1.316-.428-.986 0-1.494.604-.379.45-.494 1.234zm-27.053 2.77V4.7h-1.86v12.095h5.333V15.15zm7.103-5.908v7.553h-1.843V9.242h1.843z'/%3E%3Cpath fill='%23fff' d='m19.63 11.151-.757-1.71-.345 1.71-1.12 5.644h-1.827L18.083 4.7h.197l3.325 6.533.988 2.19.988-2.19L26.839 4.7h.181l2.6 12.095h-1.81l-1.218-5.644-.362-1.71-.658 1.71-2.93 5.644h-.098l-2.913-5.644zm14.836 5.81q-1.02 0-1.893-.478a3.8 3.8 0 0 1-1.381-1.382q-.51-.906-.51-2.106 0-1.185.444-2.074a3.36 3.36 0 0 1 1.3-1.382q.839-.494 1.974-.494a3.3 3.3 0 0 1 1.234.231 3.3 3.3 0 0 1 .97.575q.396.33.527.659l.033-1.267h1.694v7.553H37.18l-.033-1.332q-.279.593-1.02 1.053a3.17 3.17 0 0 1-1.662.444zm.296-1.482q.938 0 1.58-.642.642-.66.642-1.711v-.115q0-.708-.296-1.267a2.2 2.2 0 0 0-.807-.872 2.1 2.1 0 0 0-1.119-.313q-1.053 0-1.629.692-.575.675-.575 1.76 0 1.103.559 1.795.577.675 1.645.675zm6.521-6.237h1.711v1.4q.906-1.597 2.83-1.597 1.596 0 2.584 1.02.988 1.005.988 2.914 0 1.185-.493 2.09a3.46 3.46 0 0 1-1.316 1.399 3.5 3.5 0 0 1-1.844.493q-.954 0-1.662-.329a2.67 2.67 0 0 1-1.086-.97l.017 5.134h-1.728zm4.048 6.22q1.07 0 1.645-.674.577-.69.576-1.762 0-1.119-.576-1.777-.558-.675-1.645-.675-.592 0-1.12.296-.51.28-.822.823-.296.527-.296 1.234v.115q0 .708.296 1.267.313.543.823.855.51.296 1.119.297z'/%3E%3Cpath fill='%23e1e3e9' d='M51.325 4.7h1.86v10.45h3.473v1.646h-5.333zm7.12 4.542h1.843v7.553h-1.843zm.905-1.415a1.16 1.16 0 0 1-.856-.346 1.17 1.17 0 0 1-.346-.856 1.05 1.05 0 0 1 .346-.79q.346-.329.856-.329.494 0 .839.33a1.05 1.05 0 0 1 .345.79 1.16 1.16 0 0 1-.345.855q-.33.346-.84.346zm7.875 9.133a3.17 3.17 0 0 1-1.662-.444q-.723-.46-1.004-1.053l-.033 1.332h-1.71V4.701h1.743v4.657l-.082 1.283q.279-.658 1.086-1.119a3.5 3.5 0 0 1 1.778-.477q1.119 0 1.942.51a3.24 3.24 0 0 1 1.283 1.4q.445.888.444 2.072 0 1.201-.526 2.09a3.5 3.5 0 0 1-1.382 1.366 3.8 3.8 0 0 1-1.876.477zm-.296-1.481q1.069 0 1.645-.675.577-.69.577-1.778 0-1.102-.577-1.776-.56-.691-1.645-.692a2.12 2.12 0 0 0-1.58.659q-.642.641-.642 1.694v.115q0 .71.296 1.267a2.4 2.4 0 0 0 .807.872 2.1 2.1 0 0 0 1.119.313zm5.927-6.237h1.777v1.481q.263-.757.856-1.217a2.14 2.14 0 0 1 1.349-.46q.527 0 .724.098l-.247 1.794q-.149-.099-.642-.099-.774 0-1.416.494-.626.493-.626 1.58v3.883h-1.777V9.242zm9.534 7.718q-1.35 0-2.255-.526-.904-.543-1.332-1.432a4.6 4.6 0 0 1-.428-1.975q0-1.2.493-2.106a3.46 3.46 0 0 1 1.4-1.382q.889-.495 2.007-.494 1.744 0 2.584.97.855.956.856 2.7 0 .444-.05.92h-5.43q.18 1.005.708 1.45.542.443 1.497.443.79 0 1.3-.131a4 4 0 0 0 .938-.362l.542 1.267q-.411.263-1.119.46-.708.198-1.711.197zm1.596-4.558q.016-1.02-.444-1.432-.46-.428-1.316-.428-1.728 0-1.991 1.86z'/%3E%3Cpath d='M5.074 15.948a.484.657 0 0 0-.486.659v1.84a.484.657 0 0 0 .486.659h4.101a.484.657 0 0 0 .486-.659v-1.84a.484.657 0 0 0-.486-.659zm3.56 1.16H5.617v.838h3.017z' style='fill:%23fff;fill-rule:evenodd;stroke-width:1.03600001'/%3E%3Cg style='stroke-width:1.12603545'%3E%3Cpath d='M-9.408-1.416c-3.833-.025-7.056 2.912-7.08 6.615-.02 3.08 1.653 4.832 3.107 6.268.903.892 1.721 1.74 2.32 2.902l-.525-.004c-.543-.003-.992.304-1.24.639a1.87 1.87 0 0 0-.362 1.121l-.011 1.877c-.003.402.104.787.347 1.125.244.338.688.653 1.23.656l4.142.028c.542.003.99-.306 1.238-.641a1.87 1.87 0 0 0 .363-1.121l.012-1.875a1.87 1.87 0 0 0-.348-1.127c-.243-.338-.688-.653-1.23-.656l-.518-.004c.597-1.145 1.425-1.983 2.348-2.87 1.473-1.414 3.18-3.149 3.2-6.226-.016-3.59-2.923-6.684-6.993-6.707m-.006 1.1v.002c3.274.02 5.92 2.532 5.9 5.6-.017 2.706-1.39 4.026-2.863 5.44-1.034.994-2.118 2.033-2.814 3.633-.018.041-.052.055-.075.065q-.013.004-.02.01a.34.34 0 0 1-.226.084.34.34 0 0 1-.224-.086l-.092-.077c-.699-1.615-1.768-2.669-2.781-3.67-1.454-1.435-2.797-2.762-2.78-5.478.02-3.067 2.7-5.545 5.975-5.523m-.02 2.826c-1.62-.01-2.944 1.315-2.955 2.96-.01 1.646 1.295 2.988 2.916 2.999h.002c1.621.01 2.943-1.316 2.953-2.961.011-1.646-1.294-2.988-2.916-2.998m-.005 1.1c1.017.006 1.829.83 1.822 1.89s-.83 1.874-1.848 1.867c-1.018-.006-1.829-.83-1.822-1.89s.83-1.874 1.848-1.868m-2.155 11.857 4.14.025c.271.002.49.305.487.676l-.013 1.875c-.003.37-.224.67-.495.668l-4.14-.025c-.27-.002-.487-.306-.485-.676l.012-1.875c.003-.37.224-.67.494-.668' style='color:%23000;font-style:normal;font-variant:normal;font-weight:400;font-stretch:normal;font-size:medium;line-height:normal;font-family:sans-serif;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:%23000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:start;white-space:normal;shape-padding:0;clip-rule:evenodd;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:%23000;solid-opacity:1;vector-effect:none;fill:%23000;fill-opacity:.4;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto' transform='translate(15.553 2.85)scale(.88807)'/%3E%3Cpath d='M-9.415-.316C-12.69-.338-15.37 2.14-15.39 5.207c-.017 2.716 1.326 4.041 2.78 5.477 1.013 1 2.081 2.055 2.78 3.67l.092.076a.34.34 0 0 0 .225.086.34.34 0 0 0 .227-.083l.019-.01c.022-.009.057-.024.074-.064.697-1.6 1.78-2.64 2.814-3.634 1.473-1.414 2.847-2.733 2.864-5.44.02-3.067-2.627-5.58-5.901-5.601m-.057 8.784c1.621.011 2.944-1.315 2.955-2.96.01-1.646-1.295-2.988-2.916-2.999-1.622-.01-2.945 1.315-2.955 2.96s1.295 2.989 2.916 3' style='clip-rule:evenodd;fill:%23e1e3e9;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:.4' transform='translate(15.553 2.85)scale(.88807)'/%3E%3Cpath d='M-11.594 15.465c-.27-.002-.492.297-.494.668l-.012 1.876c-.003.371.214.673.485.675l4.14.027c.271.002.492-.298.495-.668l.012-1.877c.003-.37-.215-.672-.485-.674z' style='clip-rule:evenodd;fill:%23fff;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.47727823;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:.4' transform='translate(15.553 2.85)scale(.88807)'/%3E%3C/g%3E%3C/svg%3E")}}.maplibregl-ctrl.maplibregl-ctrl-attrib{background-color:hsla(0,0%,100%,.5);margin:0;padding:0 5px}@media screen{.maplibregl-ctrl-attrib.maplibregl-compact{background-color:#fff;border-radius:12px;box-sizing:content-box;color:#000;margin:10px;min-height:20px;padding:2px 24px 2px 0;position:relative}.maplibregl-ctrl-attrib.maplibregl-compact-show{padding:2px 28px 2px 8px;visibility:visible}.maplibregl-ctrl-bottom-left>.maplibregl-ctrl-attrib.maplibregl-compact-show,.maplibregl-ctrl-top-left>.maplibregl-ctrl-attrib.maplibregl-compact-show{border-radius:12px;padding:2px 8px 2px 28px}.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner{display:none}.maplibregl-ctrl-attrib-button{background-color:hsla(0,0%,100%,.5);background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill-rule='evenodd' viewBox='0 0 20 20'%3E%3Cpath d='M4 10a6 6 0 1 0 12 0 6 6 0 1 0-12 0m5-3a1 1 0 1 0 2 0 1 1 0 1 0-2 0m0 3a1 1 0 1 1 2 0v3a1 1 0 1 1-2 0'/%3E%3C/svg%3E");border:0;border-radius:12px;box-sizing:border-box;cursor:pointer;display:none;height:24px;outline:none;position:absolute;right:0;top:0;width:24px}.maplibregl-ctrl-attrib summary.maplibregl-ctrl-attrib-button{-webkit-appearance:none;-moz-appearance:none;appearance:none;list-style:none}.maplibregl-ctrl-attrib summary.maplibregl-ctrl-attrib-button::-webkit-details-marker{display:none}.maplibregl-ctrl-bottom-left .maplibregl-ctrl-attrib-button,.maplibregl-ctrl-top-left .maplibregl-ctrl-attrib-button{left:0}.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button,.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner{display:block}.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-button{background-color:rgb(0 0 0/5%)}.maplibregl-ctrl-bottom-right>.maplibregl-ctrl-attrib.maplibregl-compact:after{bottom:0;right:0}.maplibregl-ctrl-top-right>.maplibregl-ctrl-attrib.maplibregl-compact:after{right:0;top:0}.maplibregl-ctrl-top-left>.maplibregl-ctrl-attrib.maplibregl-compact:after{left:0;top:0}.maplibregl-ctrl-bottom-left>.maplibregl-ctrl-attrib.maplibregl-compact:after{bottom:0;left:0}}@media screen and (forced-colors:active){.maplibregl-ctrl-attrib.maplibregl-compact:after{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='%23fff' fill-rule='evenodd' viewBox='0 0 20 20'%3E%3Cpath d='M4 10a6 6 0 1 0 12 0 6 6 0 1 0-12 0m5-3a1 1 0 1 0 2 0 1 1 0 1 0-2 0m0 3a1 1 0 1 1 2 0v3a1 1 0 1 1-2 0'/%3E%3C/svg%3E")}}@media screen and (forced-colors:active) and (prefers-color-scheme:light){.maplibregl-ctrl-attrib.maplibregl-compact:after{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill-rule='evenodd' viewBox='0 0 20 20'%3E%3Cpath d='M4 10a6 6 0 1 0 12 0 6 6 0 1 0-12 0m5-3a1 1 0 1 0 2 0 1 1 0 1 0-2 0m0 3a1 1 0 1 1 2 0v3a1 1 0 1 1-2 0'/%3E%3C/svg%3E")}}.maplibregl-ctrl-attrib a{color:rgba(0,0,0,.75);text-decoration:none}.maplibregl-ctrl-attrib a:hover{color:inherit;text-decoration:underline}.maplibregl-attrib-empty{display:none}.maplibregl-ctrl-scale{background-color:hsla(0,0%,100%,.75);border:2px solid #333;border-top:#333;box-sizing:border-box;color:#333;font-size:10px;padding:0 5px}.maplibregl-popup{display:flex;left:0;pointer-events:none;position:absolute;top:0;will-change:transform}.maplibregl-popup-anchor-top,.maplibregl-popup-anchor-top-left,.maplibregl-popup-anchor-top-right{flex-direction:column}.maplibregl-popup-anchor-bottom,.maplibregl-popup-anchor-bottom-left,.maplibregl-popup-anchor-bottom-right{flex-direction:column-reverse}.maplibregl-popup-anchor-left{flex-direction:row}.maplibregl-popup-anchor-right{flex-direction:row-reverse}.maplibregl-popup-tip{border:10px solid transparent;height:0;width:0;z-index:1}.maplibregl-popup-anchor-top .maplibregl-popup-tip{align-self:center;border-bottom-color:#fff;border-top:none}.maplibregl-popup-anchor-top-left .maplibregl-popup-tip{align-self:flex-start;border-bottom-color:#fff;border-left:none;border-top:none}.maplibregl-popup-anchor-top-right .maplibregl-popup-tip{align-self:flex-end;border-bottom-color:#fff;border-right:none;border-top:none}.maplibregl-popup-anchor-bottom .maplibregl-popup-tip{align-self:center;border-bottom:none;border-top-color:#fff}.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip{align-self:flex-start;border-bottom:none;border-left:none;border-top-color:#fff}.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip{align-self:flex-end;border-bottom:none;border-right:none;border-top-color:#fff}.maplibregl-popup-anchor-left .maplibregl-popup-tip{align-self:center;border-left:none;border-right-color:#fff}.maplibregl-popup-anchor-right .maplibregl-popup-tip{align-self:center;border-left-color:#fff;border-right:none}.maplibregl-popup-close-button{background-color:transparent;border:0;border-radius:0 3px 0 0;cursor:pointer;position:absolute;right:0;top:0}.maplibregl-popup-close-button:hover{background-color:rgb(0 0 0/5%)}.maplibregl-popup-content{background:#fff;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,.1);padding:15px 10px;pointer-events:auto;position:relative}.maplibregl-popup-anchor-top-left .maplibregl-popup-content{border-top-left-radius:0}.maplibregl-popup-anchor-top-right .maplibregl-popup-content{border-top-right-radius:0}.maplibregl-popup-anchor-bottom-left .maplibregl-popup-content{border-bottom-left-radius:0}.maplibregl-popup-anchor-bottom-right .maplibregl-popup-content{border-bottom-right-radius:0}.maplibregl-popup-track-pointer{display:none}.maplibregl-popup-track-pointer *{pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.maplibregl-map:hover .maplibregl-popup-track-pointer{display:flex}.maplibregl-map:active .maplibregl-popup-track-pointer{display:none}.maplibregl-marker{left:0;position:absolute;top:0;transition:opacity .2s;will-change:transform}.maplibregl-user-location-dot,.maplibregl-user-location-dot:before{background-color:#1da1f2;border-radius:50%;height:15px;width:15px}.maplibregl-user-location-dot:before{animation:maplibregl-user-location-dot-pulse 2s infinite;content:"";position:absolute}.maplibregl-user-location-dot:after{border:2px solid #fff;border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,.35);box-sizing:border-box;content:"";height:19px;left:-2px;position:absolute;top:-2px;width:19px}@keyframes maplibregl-user-location-dot-pulse{0%{opacity:1;transform:scale(1)}70%{opacity:0;transform:scale(3)}to{opacity:0;transform:scale(1)}}.maplibregl-user-location-dot-stale{background-color:#aaa}.maplibregl-user-location-dot-stale:after{display:none}.maplibregl-user-location-accuracy-circle{background-color:#1da1f233;border-radius:100%;height:1px;width:1px}.maplibregl-crosshair,.maplibregl-crosshair .maplibregl-interactive,.maplibregl-crosshair .maplibregl-interactive:active{cursor:crosshair}.maplibregl-boxzoom{background:#fff;border:2px dotted #202020;height:0;left:0;opacity:.5;position:absolute;top:0;width:0}.maplibregl-cooperative-gesture-screen{align-items:center;background:rgba(0,0,0,.4);color:#fff;display:flex;font-size:1.4em;inset:0;justify-content:center;line-height:1.2;opacity:0;padding:1rem;pointer-events:none;position:absolute;transition:opacity 1s ease 1s;z-index:99999}.maplibregl-cooperative-gesture-screen.maplibregl-show{opacity:1;transition:opacity .05s}.maplibregl-cooperative-gesture-screen .maplibregl-mobile-message{display:none}@media (hover:none),(width <= 480px){.maplibregl-cooperative-gesture-screen .maplibregl-desktop-message{display:none}.maplibregl-cooperative-gesture-screen .maplibregl-mobile-message{display:block}}.maplibregl-pseudo-fullscreen{height:100%!important;left:0!important;position:fixed!important;top:0!important;width:100%!important;z-index:99999}
+.maplibregl-map { font-family: var(--font); }
+.maplibregl-popup { z-index: 4; }
+.maplibregl-popup-content { background: var(--panel); color: var(--ink); box-shadow: var(--shadow); border: 1px solid var(--line); border-radius: 12px; padding: 13px 15px; font-size: 13px; line-height: 1.4; min-width: 200px; }
+.maplibregl-popup-anchor-top .maplibregl-popup-tip, .maplibregl-popup-anchor-top-left .maplibregl-popup-tip, .maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: var(--panel); }
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip, .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip, .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: var(--panel); }
+.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--panel); }
+.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--panel); }
+.maplibregl-popup-close-button { color: var(--muted); font-size: 18px; padding: 2px 8px; }
+.maplibregl-ctrl-group { background: var(--panel); border-radius: 10px; overflow: hidden; }
+.maplibregl-ctrl-group:not(:empty) { box-shadow: var(--shadow); border: 1px solid var(--line); }
+.maplibregl-ctrl-group button + button { border-top-color: var(--line); }
+.maplibregl-ctrl-attrib { font-size: 10.5px; }
+.maplibregl-ctrl-bottom-right { right: env(safe-area-inset-right, 0px); bottom: env(safe-area-inset-bottom, 0px); }
+#vista { width: 29px; height: 29px; font: 700 11px/1 var(--font); color: #333; }
+.maplibregl-ctrl-group button#satelite { width: auto; height: 29px; padding: 0 10px; font: 600 12px/1 var(--font); color: #333; white-space: nowrap; }
+/* Botón «Mi ubicación» con su nombre escrito */
+.maplibregl-ctrl-group button.maplibregl-ctrl-geolocate { width: auto; height: 38px; display: flex; align-items: center; padding-right: 13px; }
+.maplibregl-ctrl-group button.maplibregl-ctrl-geolocate .maplibregl-ctrl-icon { width: 38px; height: 38px; flex: none; background-size: 32px; }
+.maplibregl-ctrl-geolocate::after { content: "Mi ubicación"; font: 600 14px/1 var(--font); color: #333; white-space: nowrap; }
+/* Icono de «Mi ubicación» en el verde del panel (mientras no está siguiendo al usuario) */
+.maplibregl-ctrl-geolocate:not(.maplibregl-ctrl-geolocate-active):not(.maplibregl-ctrl-geolocate-background):not(.maplibregl-ctrl-geolocate-active-error):not(.maplibregl-ctrl-geolocate-background-error):not(:disabled) .maplibregl-ctrl-icon { background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%230b6f6a' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E"); }
+
+.pop { max-width: 290px; }
+.pop .uso { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px 2px 6px; border-radius: 99px; background: color-mix(in srgb, var(--c) 13%, var(--panel)); color: color-mix(in srgb, var(--c) 75%, var(--ink)); font-size: 11.5px; font-weight: 700; }
+.pop .uso::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+.pop h3 { margin: 8px 18px 2px 0; font-size: 15px; font-weight: 700; line-height: 1.2; }
+.pop .cifras { display: flex; gap: 16px; margin-top: 9px; }
+.pop .fig { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+.pop .fig small { display: block; font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-top: 3px; }
+.pop dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 10px 0 0; font-size: 12.5px; }
+.pop dt { color: var(--muted); }
+.pop dd { margin: 0; }
+.pop .note { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
+.pop a { color: var(--accent); font-weight: 600; }
+.pop .vt { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); }
+.pop .vt h4 { margin: 0 0 6px; font-size: 13px; }
+.pop .vt h4 b { color: var(--vt-3); }
+.pop .vt ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 190px; overflow-y: auto; font-size: 12px; }
+.pop .vt li { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.pop .vt li small { color: var(--muted); }
+.pop .vt .dir { color: var(--muted); font-size: 11.5px; margin: 6px 0 2px; font-weight: 600; }
+.pop .vt .sin { font-size: 12px; color: var(--muted); }
+.pop .dirs { margin-top: 8px; font-size: 14px; font-weight: 700; line-height: 1.3; }
+.pop .dirs small { font-weight: 400; color: var(--muted); }
+.pop .vt li.dir { display: block; grid-column: 1 / -1; }
+.pop.vutprimero { display: flex; flex-direction: column; }
+.pop.vutprimero .uso { order: -2; align-self: flex-start; }
+.pop.vutprimero .vt { order: -1; border-top: 0; padding-top: 0; margin-top: 8px; margin-bottom: 4px; }
+
+/* ---------- Móvil: el panel pasa abajo ---------- */
+@media (max-width: 720px) {
+  #panel { top: auto; left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px));
+    bottom: calc(32px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 62%; padding: 13px 14px 12px; gap: 9px; }
+  h1 { font-size: 17px; }
+  #layers { grid-template-columns: repeat(2, 1fr); gap: 5px; }
+  .layer { padding: 7px 8px; }
+  .layer .big { font-size: 16px; }
+  #mini { order: -1; position: static; margin: -13px -14px -4px; width: calc(100% + 28px); border-radius: 13px 13px 0 0; height: 24px; }
+  #mini svg { transform: rotate(180deg); }
+  #abrir { top: auto; bottom: calc(32px + env(safe-area-inset-bottom, 0px)); left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); width: auto; height: 30px; }
+  #abrir svg { transform: none; }
+  #creditos { left: max(10px, env(safe-area-inset-left, 0px)); max-width: calc(100% - 20px); font-size: 9.5px; }
+  .maplibregl-ctrl-bottom-right { top: calc(14px + env(safe-area-inset-top, 0px)); bottom: auto; }
+}
+@media (prefers-reduced-motion: reduce) { #barra span { transition: none; } }
+</style>
+
+<div id="app">
+  <div id="map" aria-label="Mapa de plazas turísticas de Málaga"></div>
+
+  <section id="panel" aria-label="Panel del mapa">
+    <h1 id="titulo">Plazas turísticas en <em>Málaga</em></h1>
+    <div id="resumen">Cargando los edificios del Catastro…</div>
+    <form id="vbuscar" role="search"><input id="vq" type="search" placeholder="Busca calle y número, hotel o nº de registro" aria-label="Buscar por dirección, nombre del establecimiento o número de registro" autocomplete="off"></form>
+    <ul id="vres" aria-label="Resultados"></ul>
+
+    <div id="vut">
+      <div class="sec"><h2>Viviendas turísticas</h2><button type="button" class="ver" id="verVut" aria-label="Ocultar las viviendas turísticas en el mapa">Ocultar</button></div>
+      <div class="sub" id="vutSub"></div>
+      <div id="filtroAnio" class="filtroAnio"><span id="anioLbl" class="anioLbl">Años de inscripción</span><details id="anioDd" class="anioDd"><summary id="anioSum" class="anioSum" aria-labelledby="anioLbl anioSum">Todos los años</summary><div id="anioLista" class="anioLista" role="group" aria-labelledby="anioLbl"></div></details></div>
+      <div id="aniosW" class="aniosW"><div id="anios" class="anios" role="group" aria-label="Viviendas turísticas inscritas cada año. Pulsa un año para verlo en el mapa"></div><small>Viviendas inscritas cada año que siguen hoy en el registro. Pulsa una o varias barras para verlas en el mapa.</small></div>
+      <div class="esc" aria-label="Viviendas turísticas inscritas por edificio">
+        <span>Por edificio:</span><span><i style="--c:var(--vt-1)"></i>1</span><span><i style="--c:var(--vt-2)"></i>2–4</span><span><i style="--c:var(--vt-3)"></i>5–19</span><span><i style="--c:var(--vt-4)"></i>20 o más</span><span><i style="--c:var(--vt-0)"></i>Ninguna</span>
+      </div>
+    </div>
+
+    <div id="aloj">
+      <div class="sec"><h2>Hoteles, hostales y similares</h2><button type="button" class="ver" id="verAl" aria-label="Ocultar los hoteles, hostales y similares en el mapa">Ocultar</button></div>
+      <div class="sub" id="alSub">Cargando el Registro de Turismo…</div>
+      <div class="filtroAnio"><span id="anioLbl2" class="anioLbl">Años de inscripción</span><details id="anioDd2" class="anioDd"><summary id="anioSum2" class="anioSum" aria-labelledby="anioLbl2 anioSum2">Todos los años</summary><div id="anioLista2" class="anioLista" role="group" aria-labelledby="anioLbl2"></div></details></div>
+      <div class="aniosW"><div id="anios2" class="anios" role="group" aria-label="Establecimientos inscritos cada año. Pulsa un año para verlo en el mapa"></div><small>Establecimientos inscritos cada año que siguen hoy en el registro; la primera barra reúne los inscritos antes de 2000. Pulsa una o varias barras para verlos en el mapa.</small></div>
+      <table id="alTipos" aria-label="Establecimientos y plazas por tipo"></table>
+      <div class="esc" aria-label="Leyenda de hoteles, hostales y similares">
+        <span><i style="--c:var(--al)"></i>Edificio con hotel, hostal o similar</span><span><i class="rayas"></i>Y además viviendas turísticas</span><span><i class="circ" style="--d:10px"></i>Dentro de un gran complejo (centro comercial, estación) o sin edificio en el Catastro (tamaño según plazas)</span>
+      </div>
+    </div>
+
+    <div id="autorPanel">Elaborado por: <b>Álvaro Carrillo</b></div>
+    <button id="mini" class="franja" type="button" aria-label="Minimizar el panel" title="Minimizar el panel para ver todo el mapa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+  </section>
+
+  <div id="creditos">Edificios: <a href="https://www.catastro.hacienda.gob.es/webinspire/index.html" target="_blank" rel="noopener">Dirección General del Catastro</a> · Viviendas turísticas: <a href="https://www.juntadeandalucia.es/datosabiertos/portal/dataset/openrta" target="_blank" rel="noopener">Junta de Andalucía</a> · Mapa: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org" target="_blank" rel="noopener">OpenMapTiles</a>, datos de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a><span id="creditoSat" hidden> · Ortofoto: PNOA cedido por © <a href="https://www.ign.es" target="_blank" rel="noopener">IGN</a></span></div>
+  <button id="abrir" class="franja" type="button" aria-label="Mostrar el panel" title="Mostrar el panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt = new Intl.NumberFormat('es-ES', { useGrouping: 'always' });
+  var fmt1 = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+  var css = function (name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+
+  // Usos del Catastro (clasificación INSPIRE). Orden: de más a menos superficie en Málaga.
+  var USOS = [
+    { id: 'r', nombre: 'Residencial', desc: 'Viviendas, incluidos sus garajes y trasteros' },
+    { id: 's', nombre: 'Servicios públicos', desc: 'Equipamientos: educación, sanidad, cultura, deporte, administración…' },
+    { id: 'i', nombre: 'Industrial', desc: 'Naves, talleres y almacenes' },
+    { id: 'c', nombre: 'Comercial', desc: 'Comercio, hostelería y ocio' },
+    { id: 'a', nombre: 'Agrario', desc: 'Construcciones agrarias y edificios en suelo rústico' },
+    { id: 'o', nombre: 'Oficinas', desc: 'Edificios de oficinas' },
+    { id: 'x', nombre: 'Sin uso asignado', desc: 'El Catastro no indica el uso' }
+  ];
+  var USO = {}; USOS.forEach(function (u) { USO[u.id] = u; u.c = css('--u-' + u.id); });
+  var ESTADO = { d: 'En mal estado', u: 'En ruina' };
+
+  var activos = {}; USOS.forEach(function (u) { activos[u.id] = true; });
+  var medida = 'm2', ambito = 'todo';
+  var E = null; // datos: listas paralelas por edificio
+  var modo = 'vut';
+  var ERC = {};
+  var V = [], VB = {}, VN = 0, VP = 0, VED = 0; // viviendas turísticas, por referencia catastral de edificio
+  var norm = function (s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim(); };
+
+  // m² en formato corto: 38,3 M · 512 mil · 900
+  function m2corto(v) {
+    if (v >= 1e6) return fmt1.format(v / 1e6) + ' <small>M m²</small>';
+    if (v >= 1e4) return fmt.format(Math.round(v / 1e3)) + ' <small>mil m²</small>';
+    return fmt.format(Math.round(v)) + ' <small>m²</small>';
+  }
+
+  // ---------- Panel ----------
+  function totales() {
+    var t = {}; USOS.forEach(function (u) { t[u.id] = { n: 0, m2: 0 }; });
+    if (!E) return t;
+    var b = ambito === 'vista' && map ? map.getBounds() : null;
+    var w, s, e, n; if (b) { w = b.getWest(); s = b.getSouth(); e = b.getEast(); n = b.getNorth(); }
+    for (var k = 0; k < E.u.length; k++) {
+      if (b && (E.cx[k] < w || E.cx[k] > e || E.cy[k] < s || E.cy[k] > n)) continue;
+      var o = t[E.u[k]]; o.n++; o.m2 += E.a[k];
+    }
+    return t;
+  }
+  function pintarPanel() {
+    if (modo === 'vut') {
+      if (!V.length) { $('resumen').innerHTML = 'Cargando el Registro de Turismo…'; return; }
+      var LV = V.filter(enAnio), pv = 0; LV.forEach(function (v) { pv += v.plz; });
+      $('vutSub').innerHTML = '<b class="num">' + fmt.format(LV.length) + '</b> viviendas con <b class="num">' + fmt.format(pv) + '</b> plazas' + (ANIO ? ', inscritas en ' + ANIO : '');
+      var LA = AL.filter(enAnio2), pa = 0; LA.forEach(function (a) { pa += a.plz; });
+      if (AL.length) {
+        $('alSub').innerHTML = '<b class="num">' + fmt.format(LA.length) + '</b> establecimientos con <b class="num">' + fmt.format(pa) + '</b> plazas' + (ANIO2 ? ', inscritos ' + enTexto(ANIO2) : '') + (Object.keys(TSEL).length ? ' (tipos elegidos)' : '');
+        var hayT = Object.keys(TSEL).length, LY = AL.filter(function (a) { return FA.en(a.f); });
+        $('alTipos').innerHTML = '<tr><th>' + (hayT ? '<button type="button" class="todos">Ver todos los tipos</button>' : 'Tipo · pulsa para filtrar') + '</th><th>Establec.</th><th>Plazas</th></tr>' + GRUPOS.map(function (g, i) {
+          var n = 0, p = 0; LY.forEach(function (a) { if (g.f(a)) { n++; p += a.plz; } });
+          return n ? '<tr data-g="' + i + '" class="' + (TSEL[i] ? 'sel' : hayT ? 'off' : '') + '"><td><button type="button" aria-pressed="' + !!TSEL[i] + '"><i></i>' + g.n + '</button></td><td>' + fmt.format(n) + '</td><td>' + fmt.format(p) + '</td></tr>' : ''; }).join('');
+      }
+      var filtrado = ANIO || ANIO2 || Object.keys(TSEL).length;
+      $('resumen').innerHTML = '<b class="num">' + fmt.format(pv + pa) + '</b> plazas turísticas inscritas en el municipio' + (filtrado ? ' con los filtros elegidos' : '') + ': <b class="num">' + fmt.format(pv) + '</b> en viviendas turísticas y <b class="num">' + fmt.format(pa) + '</b> en hoteles, hostales y similares';
+      return;
+    }
+    var t = totales(), N = 0, M = 0;
+    USOS.forEach(function (u) { N += t[u.id].n; M += t[u.id].m2; });
+    var visN = 0, visM = 0; USOS.forEach(function (u) { if (activos[u.id]) { visN += t[u.id].n; visM += t[u.id].m2; } });
+    var todos = USOS.every(function (u) { return activos[u.id]; });
+    if (E) $('resumen').innerHTML = '<b class="num">' + fmt.format(todos ? N : visN) + '</b> edificios y <b class="num">' + fmt1.format((todos ? M : visM) / 1e6) + ' millones</b> de m² construidos' +
+      (ambito === 'vista' ? ' en la zona del mapa que se ve' : ' en el término municipal') + (todos ? '' : ' (usos seleccionados)');
+    $('barra').innerHTML = USOS.map(function (u) {
+      var v = medida === 'm2' ? t[u.id].m2 : t[u.id].n;
+      return '<span style="flex-grow:' + v + ';background:' + u.c + (activos[u.id] ? '' : ';opacity:.3') + '" title="' + u.nombre + '"></span>'; }).join('');
+    $('layers').innerHTML = USOS.map(function (u) {
+      var o = t[u.id], tot = medida === 'm2' ? M : N, v = medida === 'm2' ? o.m2 : o.n;
+      var pct = tot ? v / tot * 100 : 0;
+      var big = medida === 'm2' ? m2corto(o.m2) : fmt.format(o.n) + ' <small>edif.</small>';
+      var otro = medida === 'm2' ? fmt.format(o.n) + ' edificios' : (o.m2 >= 1e6 ? fmt1.format(o.m2 / 1e6) + ' M m²' : fmt.format(Math.round(o.m2 / 1e3)) + ' mil m²');
+      return '<button class="layer" type="button" data-uso="' + u.id + '" aria-pressed="' + activos[u.id] + '" style="--c:' + u.c + '" title="' + esc(u.desc) + '">' +
+        '<span class="big num">' + big + '</span><span class="sw"></span><span class="lbl">' + u.nombre + ' · ' + (pct >= 10 ? Math.round(pct) : fmt1.format(pct)) + '%<small class="num">' + otro + '</small></span></button>';
+    }).join('') + '<button class="layer todo" type="button" id="verTodo"><span class="lbl">' + (todos ? 'Todos los usos visibles · pulsa uno para verlo solo' : 'Ver todos los usos') + '</span></button>';
+  }
+  // ---------- Buscador: todas las calles y portales del callejero del Catastro ----------
+  // direcciones.txt: nombres de calle, «####», y una línea por portal → nº calle|número|ref. catastral|lon|lat|CP
+  var S = [], SN = [], SP = [], P = [];
+  var dirCargado = fetch('direcciones.txt').then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (t) {
+    var partes = t.split('\n####\n');
+    S = partes[0].split('\n'); SN = S.map(norm); SP = S.map(function () { return []; });
+    partes[1].split('\n').forEach(function (l) {
+      var q = l.split('|'); if (q.length < 5) return;
+      var o = { s: +q[0], num: q[1], rc: q[2], lon: +q[3], lat: +q[4], cp: q[5] };
+      o.n = parseInt(o.num, 10) || 0; P.push(o); SP[o.s].push(P.length - 1);
+    });
+    SP.forEach(function (l) { l.sort(function (a, b) { return P[a].n - P[b].n || P[a].num.localeCompare(P[b].num); }); });
+    P.porRc = {}; P.forEach(function (o, k) { (P.porRc[o.rc] = P.porRc[o.rc] || []).push(k); });
+    if ($('vq').value) $('vq').dispatchEvent(new Event('input'));
+  }).catch(function () {});
+  var nVut = function (rc) { return (VB[rc] || []).length; };
+  var etiqueta = function (n) { return '<span class="v num" style="color:var(' + (n ? '--vt-3' : '--muted') + ')">' + n + ' VUT</span>'; };
+  var TIPOS = /^(calle|avenida|plaza|pasaje|camino|carretera|paseo|urbanizacion|barrio|callejon|glorieta|travesia|ronda|poligono|lugar|alameda|parque|cuesta|diseminado|prolongacion|senda|vereda|plazuela|via|canada|explanada|rambla|subida|bulevar|bv|cl|av|pz|pj|cm|cr|ps) /;
+  var sinTipo = function (n) { return n.replace(TIPOS, ''); };
+  function totalCalle(si) { var vistos = {}, tot = 0; SP[si].forEach(function (k) { var rc = P[k].rc; if (!vistos[rc]) { vistos[rc] = 1; tot += nVut(rc); } }); return tot; }
+  function verCalle(si) {
+    var ps = SP[si];
+    $('vres').innerHTML = '<li><button type="button" data-volver="1"><span class="n">← ' + esc(S[si]) + '<small>' + ps.length + ' portales · ' + totalCalle(si) + ' viviendas turísticas inscritas en sus edificios</small></span></button></li>' +
+      ps.map(function (k) { var o = P[k]; return '<li><button type="button" data-p="' + k + '"><span class="n">Nº ' + esc(o.num) + '<small>' + esc(o.cp) + ' Málaga</small></span>' + etiqueta(nVut(o.rc)) + '</button></li>'; }).join('');
+    if (map && ps.length) {
+      var b = new maplibregl.LngLatBounds(); ps.forEach(function (k) { b.extend([P[k].lon, P[k].lat]); });
+      map.fitBounds(b, { padding: innerWidth > 720 ? { top: 80, bottom: 80, left: 420, right: 80 } : 60, maxZoom: 18, duration: 900 });
+    }
+  }
+  $('vbuscar').addEventListener('submit', function (e) { e.preventDefault(); });
+  $('vq').addEventListener('input', function () {
+    var q = norm(this.value);
+    if (q.length < 2) { $('vres').innerHTML = ''; return; }
+    var html = '';
+    // Número de registro (VUT/MA/12345 o solo el número)
+    var reg = q.replace(/^vut\/?ma\/?/, '');
+    if (/^\d{3,}$/.test(reg)) {
+      V.forEach(function (v, k) { if (v.reg.indexOf(reg) === 0 && html.length < 6000)
+        html += '<li><button type="button" data-v="' + k + '"><span class="n">VUT/MA/' + esc(v.reg) + '<small>' + esc(v.dir) + '</small></span><span class="v">Inscrita</span></button></li>'; });
+      $('vres').innerHTML = html || '<li class="vacio">Ningún número de registro VUT/MA empieza así.</li>'; return;
+    }
+    // Establecimientos por nombre o nº de registro (H/MA/…, A/MA/…)
+    if (/^[a-z]{1,4}\/ma\//.test(q)) {
+      AL.forEach(function (a, k) { if (norm(a.reg).indexOf(q) === 0) html += '<li><button type="button" data-a="' + k + '"><span class="n">' + esc(a.nom || tipoAl(a)) + '<small>' + esc(a.reg) + ' · ' + esc(a.dir) + '</small></span><span class="v num">' + a.plz + ' plazas</span></button></li>'; });
+      $('vres').innerHTML = html || '<li class="vacio">Ningún establecimiento tiene ese número de registro.</li>'; return;
+    }
+    if (q.length >= 3) { var na = 0;
+      AL.forEach(function (a, k) { if (na < 8 && a.nom && norm(a.nom).indexOf(q) >= 0) { na++;
+        html += '<li><button type="button" data-a="' + k + '"><span class="n">' + esc(a.nom) + '<small>' + esc(tipoAl(a)) + ' · ' + esc(a.dir) + '</small></span><span class="v num" style="color:var(--al)">' + a.plz + ' plazas</span></button></li>'; } }); }
+    // Calle con o sin número de portal: «granada 12», «calle granada, 12»
+    var m = q.match(/^(.*?)[\s,]+(?:n[º°o]?\.?\s*)?(\d+)\s*$/), calle = sinTipo(m ? m[1].trim() : q), num = m ? m[2] : null;
+    if (!S.length) { $('vres').innerHTML = '<li class="vacio">Cargando el callejero…</li>'; return; }
+    var cand = [];
+    for (var k = 0; k < S.length; k++) { var pos = sinTipo(SN[k]).indexOf(calle); if (pos >= 0) cand.push([pos === 0 ? 0 : 1, k]); }
+    cand.sort(function (a, b) { return a[0] - b[0] || SN[a[1]].localeCompare(SN[b[1]], 'es'); });
+    if (num) {
+      var n = 0;
+      cand.forEach(function (c) { SP[c[1]].forEach(function (k) { if (n < 40 && P[k].num.split(' ')[0] === num) { n++;
+        html += '<li><button type="button" data-p="' + k + '"><span class="n">' + esc(S[c[1]]) + ', ' + esc(P[k].num) + '<small>' + esc(P[k].cp) + ' Málaga</small></span>' + etiqueta(nVut(P[k].rc)) + '</button></li>'; } }); });
+      if (!n) html += '<li class="vacio">Ese número no aparece en el callejero del Catastro. Prueba solo con el nombre de la calle.</li>';
+    } else {
+      html += cand.slice(0, 40).map(function (c) {
+        return '<li><button type="button" data-s="' + c[1] + '"><span class="n">' + esc(S[c[1]]) + '<small>' + SP[c[1]].length + ' portales</small></span>' + etiqueta(totalCalle(c[1])) + '</button></li>'; }).join('');
+      if (!cand.length && !html) html = '<li class="vacio">No hay ninguna calle con ese nombre en el callejero del Catastro de Málaga.</li>';
+    }
+    $('vres').innerHTML = html;
+  });
+  $('vres').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || !map) return;
+    if (b.dataset.volver) { $('vq').dispatchEvent(new Event('input')); return; }
+    if (b.dataset.s) { verCalle(+b.dataset.s); return; }
+    var lon, lat, rc, dir;
+    if (b.dataset.p) { var o = P[+b.dataset.p]; lon = o.lon; lat = o.lat; rc = o.rc; dir = S[o.s] + ', ' + o.num; }
+    else if (b.dataset.a) { var a = AL[+b.dataset.a], ia = ERC[a.k];
+      lon = ia != null ? E.cx[ia] : a.lon; lat = ia != null ? E.cy[ia] : a.lat;
+      map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 17.5), duration: 900 });
+      if (innerWidth <= 720) $('app').classList.add('mini');
+      abrirAloj(a.k, [lon, lat]); return; }
+    else { var v = V[+b.dataset.v]; lon = v.lon; lat = v.lat; rc = v.rc; dir = v.dir; }
+    map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 17.5), duration: 900 });
+    if (innerWidth <= 720) $('app').classList.add('mini');
+    var ed = ERC[rc];
+    if (ed != null) abrirFicha(ed, [lon, lat]); else abrirPortal(rc, dir, [lon, lat]);
+  });
+  $('mini').addEventListener('click', function () { $('app').classList.add('mini'); });
+  $('abrir').addEventListener('click', function () { $('app').classList.remove('mini'); });
+  pintarPanel();
+
+  // ---------- Datos ----------
+  // edificios.txt: una línea por edificio → uso|refcat|año|m²|plantas|estado|viviendas|geometría
+  // Geometría: polígonos separados por «;», anillos por «/», coordenadas en millonésimas de grado codificadas como diferencias.
+  function leer(txt) {
+    var L = txt.split('\n'), feats = [];
+    E = { u: [], r: [], y: [], a: [], f: [], s: [], v: [] };
+    E.cx = new Float64Array(L.length); E.cy = new Float64Array(L.length);
+    for (var k = 0; k < L.length; k++) {
+      var p = L[k].split('|'); if (p.length < 8) continue;
+      var i = E.u.length, polys = [], sx = 0, sy = 0, sn = 0;
+      p[7].split(';').forEach(function (pg) {
+        if (!pg) return;
+        polys.push(pg.split('/').map(function (r) {
+          var d = r.split(','), x = 0, y = 0, out = [];
+          for (var j = 0; j + 1 < d.length; j += 2) { x += +d[j]; y += +d[j + 1]; out.push([x / 1e6, y / 1e6]); }
+          if (out.length && (out[0][0] !== out[out.length - 1][0] || out[0][1] !== out[out.length - 1][1])) out.push(out[0]);
+          return out;
+        }).filter(function (r) { return r.length >= 4; }));
+      });
+      polys = polys.filter(function (pg) { return pg.length; });
+      if (!polys.length) continue;
+      polys[0][0].forEach(function (c) { sx += c[0]; sy += c[1]; sn++; });
+      E.u.push(USO[p[0]] ? p[0] : 'x'); E.r.push(p[1]); E.y.push(+p[2] || 0); E.a.push(+p[3] || 0); E.f.push(+p[4] || 0); E.s.push(p[5]); E.v.push(+p[6] || 0);
+      E.cx[i] = sx / sn; E.cy[i] = sy / sn; ERC[p[1]] = i;
+      var alt = Math.max(1, Math.min(40, +p[4] || 1)) * 3.2;
+      var nv = VB[p[1]] ? VB[p[1]].length : 0;
+      if (nv) { VB[p[1]].forEach(function (v) { v.ed = i; }); VED++; }
+      feats.push({ type: 'Feature', id: i, properties: { u: E.u[i], h: alt, t: nv }, geometry: { type: 'MultiPolygon', coordinates: polys } });
+    }
+    return { type: 'FeatureCollection', features: feats };
+  }
+  // vut.txt: una línea por vivienda turística inscrita →
+  // ref. catastral del edificio|lon|lat|nº registro|fecha inscripción|planta|puerta|bloque/portal|dirección|CP|plazas|modalidad (c completa, h por habitaciones)
+  function leerVut(txt) {
+    txt.split('\n').forEach(function (l) {
+      var p = l.split('|'); if (p.length < 12) return;
+      var v = { rc: p[0], lon: +p[1], lat: +p[2], reg: p[3], f: p[4], pl: p[5], pt: p[6], bl: p[7], dir: p[8], cp: p[9], plz: +p[10] || 0, m: p[11], ed: null };
+      v.n = norm(v.dir); V.push(v); VN++; VP += v.plz;
+      (VB[v.rc] = VB[v.rc] || []).push(v);
+    });
+  }
+  var vutCargado = fetch('vut.txt').then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(leerVut).catch(function () {});
+  var datos = vutCargado.then(function () { return fetch('edificios.txt'); }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then(function (t) {
+      var gj = leer(t); GJ = gj;
+      return gj;
+    });
+  // ---------- Filtro por año de inscripción (uno por sección; permite varios años) ----------
+  function Filtro(o) {
+    var F = { sel: {}, texto: '' };
+    var clave = function (f) { var y = String(f || '').slice(0, 4); if (!/^\d{4}$/.test(y)) return ''; return o.antes && +y < o.antes ? 'antes' : y; };
+    var orden = function (a, b) { return a === 'antes' ? -1 : b === 'antes' ? 1 : a < b ? -1 : 1; };
+    F.en = function (f) { return !F.texto || !!F.sel[clave(f)]; };
+    function texto() {
+      var ks = Object.keys(F.sel).sort(orden), g = [], t;
+      ks.forEach(function (k) { var y = k === 'antes' ? null : +k, u = g[g.length - 1];
+        if (y != null && u && u[1] === y - 1) u[1] = y; else g.push([k === 'antes' ? 'antes de ' + o.antes : y, y]); });
+      t = g.map(function (r) { return r[1] == null || r[0] === r[1] ? '' + r[0] : r[0] + '–' + r[1]; });
+      return t.length > 1 ? t.slice(0, -1).join(', ') + ' y ' + t[t.length - 1] : (t[0] || '');
+    }
+    F.pintar = function () {
+      var c = {}, pl = {}; o.items().forEach(function (it) { var k = clave(it.f); if (k) { c[k] = (c[k] || 0) + 1; pl[k] = (pl[k] || 0) + it.p; } });
+      var ks = Object.keys(c).sort(orden); if (!ks.length) return;
+      var max = Math.max.apply(null, ks.map(function (k) { return c[k]; }));
+      var nom = function (k) { return k === 'antes' ? 'Antes de ' + o.antes : k; };
+      $(o.id + 'Lista' + o.suf).innerHTML = '<button type="button" class="todos">Todos los años</button>' + ks.slice().reverse().map(function (k) {
+        return '<label><input type="checkbox" value="' + k + '"' + (F.sel[k] ? ' checked' : '') + '>' + nom(k) + '<small>' + fmt.format(c[k]) + '</small></label>'; }).join('');
+      $(o.id + 'Sum' + o.suf).textContent = F.texto ? F.texto.charAt(0).toUpperCase() + F.texto.slice(1) : 'Todos los años';
+      var B = $(o.id + 's' + o.suf); B.className = 'anios' + (F.texto ? ' hay-sel' : '');
+      B.innerHTML = ks.map(function (k) {
+        var h = c[k] / max * 100, et = k === 'antes' ? '<' + String(o.antes).slice(2) : "'" + k.slice(2);
+        var verEt = !o.cadaEtiqueta || k === 'antes' || +k % o.cadaEtiqueta === 0;
+        return '<button type="button" data-y="' + k + '" aria-pressed="' + !!F.sel[k] + '"' + (c[k] === max ? ' class="max"' : '') + ' title="' + nom(k) + ': ' + fmt.format(c[k]) + ' ' + o.unidad + ', ' + fmt.format(pl[k]) + ' plazas">' +
+          '<span class="c">' + fmt.format(c[k]) + '</span><span class="b" style="height:' + (h * 0.62) + '%"></span><span class="y">' + (verEt ? et : '&nbsp;') + '</span></button>';
+      }).join('');
+    };
+    F.cambiar = function (k) {
+      if (k === null) F.sel = {}; else if (F.sel[k]) delete F.sel[k]; else F.sel[k] = 1;
+      F.texto = texto(); F.pintar(); o.cambio();
+    };
+    $(o.id + 'Lista' + o.suf).addEventListener('change', function (e) { if (e.target.value) F.cambiar(e.target.value); });
+    $(o.id + 'Lista' + o.suf).addEventListener('click', function (e) { if (e.target.closest('.todos')) { F.cambiar(null); $(o.id + 'Dd' + o.suf).open = false; } });
+    document.addEventListener('click', function (e) { var d = $(o.id + 'Dd' + o.suf); if (!d.contains(e.target)) d.open = false; });
+    $(o.id + 's' + o.suf).addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) F.cambiar(b.dataset.y); });
+    return F;
+  }
+  var ANIO = '', ANIO2 = '';
+  var enTexto = function (t) { return /^antes/.test(t) ? t : 'en ' + t; };
+  var FV = Filtro({ id: 'anio', suf: '', unidad: 'viviendas', items: function () { return V.map(function (v) { return { f: v.f, p: v.plz }; }); },
+    cambio: function () { ANIO = FV.texto; aplicarVut(); } });
+  var enAnio = function (v) { return FV.en(v.f); };
+  var deAnio = function (rc) { return (VB[rc] || []).filter(enAnio); };
+  function aplicarVut() {
+    pintarPanel();
+    if (popup) popup.remove();
+    repintar();
+  }
+  // Colorea cada edificio según lo que tenga inscrito con los años elegidos: viviendas turísticas (rosa),
+  // hoteles y similares (azul) o ambos (rayas de los dos colores, en una capa aparte).
+  var VER_V = true, VER_A = true, GJ = null;
+  var VACIO = { type: 'FeatureCollection', features: [] };
+  var nivel = function (n) { return n >= 20 ? 4 : n >= 5 ? 3 : n >= 2 ? 2 : 1; };
+  // Establecimiento dentro de un gran complejo: si el complejo tiene también viviendas turísticas, el edificio va a rayas;
+  // si no, el establecimiento se dibuja como círculo.
+  var parteVisible = function (rc) { return (PB[rc] || []).filter(enAnio2).length; };
+  function repintar() {
+    if (!map || !map.getSource('catastro') || !GJ) return;
+    var rcs = {}; Object.keys(VB).forEach(function (rc) { rcs[rc] = 1; }); Object.keys(AB).forEach(function (k) { rcs[k] = 1; }); Object.keys(PB).forEach(function (k) { rcs[k] = 1; });
+    var mix = [], ids = [];
+    Object.keys(rcs).forEach(function (rc) {
+      var i = ERC[rc]; if (i == null) return;
+      var t = VER_V ? deAnio(rc).length : 0, a = VER_A ? deAnio2(rc).length + (t ? parteVisible(rc) : 0) : 0;
+      map.setFeatureState({ source: 'catastro', id: i }, { t: t, a: a });
+      if (t && a) { ids.push(i); var g = GJ.features[i]; mix.push({ type: 'Feature', id: i, properties: { h: g.properties.h, lvl: nivel(t) }, geometry: g.geometry }); }
+    });
+    var f = ids.length ? ['!', ['in', ['id'], ['literal', ids]]] : null;
+    map.setFilter('edificios', f);
+    map.getSource('mixto').setData({ type: 'FeatureCollection', features: mix });
+    map.getSource('vutSueltas').setData(VER_V ? puntosSueltos() : VACIO);
+    map.getSource('aloj').setData(VER_A ? puntosAloj() : VACIO);
+  }
+  // Rayas diagonales: azul de hoteles + el rosa del nivel de viviendas turísticas del edificio
+  function crearRayas() {
+    [1, 2, 3, 4].forEach(function (n) {
+      var R = 2, W = 12 * R, c = document.createElement('canvas'); c.width = c.height = W;
+      var x = c.getContext('2d');
+      x.fillStyle = css('--vt-' + n); x.fillRect(0, 0, W, W);
+      x.strokeStyle = css('--al'); x.lineWidth = W / 4 * Math.SQRT2; x.lineCap = 'square';
+      [-W, 0, W].forEach(function (o) { x.beginPath(); x.moveTo(o, W); x.lineTo(o + W, 0); x.stroke(); });
+      var d = x.getImageData(0, 0, W, W);
+      if (!map.hasImage('rayas-' + n)) map.addImage('rayas-' + n, { width: W, height: W, data: d.data }, { pixelRatio: R });
+    });
+  }
+  vutCargado.then(FV.pintar);
+
+  // ---------- Hoteles, hostales, apartamentos y similares ----------
+  // alojamientos.txt: ref. catastral del edificio|lon|lat|tipo|grupo|categoría|modalidad|nº registro|fecha|nombre|dirección|CP|plazas|unidades
+  var AL = [], AB = {}, PB = {}, ALP = 0; // PB: establecimientos que ocupan solo una parte de un edificio grande, por edificio
+  function tipoAl(a) {
+    if (a.tipo === 'Apartamento turístico') return 'Edificio turístico';
+    if (a.tipo === 'Vivienda turística de alojamiento rural') return 'Vivienda turística rural';
+    if (a.tipo === 'Casa rural') return 'Casa rural';
+    if (a.tipo === 'Campamento de turismo') return a.grupo || 'Campamento de turismo';
+    return a.grupo || a.tipo;
+  }
+  var GRUPOS = [
+    { n: 'Hoteles', f: function (a) { return /^Hotel/.test(a.grupo) && a.tipo === 'Establecimiento Hotelero'; } },
+    { n: 'Hostales y pensiones', f: function (a) { return a.grupo === 'Hostal' || a.grupo === 'Pensión'; } },
+    { n: 'Edificios turísticos', f: function (a) { return a.tipo === 'Apartamento turístico'; } },
+    { n: 'Albergues', f: function (a) { return a.grupo === 'Albergue'; } },
+    { n: 'Alojamiento rural', f: function (a) { return a.tipo === 'Casa rural' || a.tipo === 'Vivienda turística de alojamiento rural'; } },
+    { n: 'Áreas de autocaravanas', f: function (a) { return a.tipo === 'Campamento de turismo'; } }
+  ];
+  var alCargado = fetch('alojamientos.txt').then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (t) {
+    t.split('\n').forEach(function (l) {
+      var q = l.split('|'); if (q.length < 14) return;
+      var a = { rc: q[0], lon: +q[1], lat: +q[2], tipo: q[3], grupo: q[4], cat: q[5], mod: q[6], reg: q[7], f: q[8], nom: q[9], dir: q[10], cp: q[11], plz: +q[12] || 0, ua: +q[13] || 0 };
+      // Si el establecimiento ocupa solo una parte de un edificio grande (centro comercial, estación, bloque de pisos…),
+      // no se rellena el edificio entero: se dibuja como círculo en la coordenada del registro.
+      a.parte = q[14] === '1';
+      a.k = a.rc && !a.parte ? a.rc : ('p' + q[1] + ',' + q[2]);
+      if (a.parte) (PB[a.rc] = PB[a.rc] || []).push(a);
+      a.n = norm(a.nom + ' ' + a.reg); AL.push(a); ALP += a.plz;
+      (AB[a.k] = AB[a.k] || []).push(a);
+    });
+    FA.pintar(); pintarPanel();
+  }).catch(function () { $('alSub').textContent = 'No se han podido cargar los establecimientos. Recarga la página.'; });
+  var FA = Filtro({ id: 'anio', suf: '2', antes: 2000, cadaEtiqueta: 5, unidad: 'establecimientos', items: function () { return AL.filter(enTipo).map(function (a) { return { f: a.f, p: a.plz }; }); },
+    cambio: function () { ANIO2 = FA.texto; aplicarAloj(); } });
+  // Filtro por tipo (pulsando la tabla): varios a la vez; ninguno elegido = todos
+  var TSEL = {};
+  var enTipo = function (a) { for (var g in TSEL) if (GRUPOS[g].f(a)) return true; return !Object.keys(TSEL).length; };
+  var enAnio2 = function (a) { return FA.en(a.f) && enTipo(a); };
+  $('alTipos').addEventListener('click', function (e) {
+    var r = e.target.closest('[data-g]'); if (r) { var g = r.dataset.g; if (TSEL[g]) delete TSEL[g]; else TSEL[g] = 1; }
+    else if (e.target.closest('.todos')) TSEL = {}; else return;
+    FA.pintar(); aplicarAloj();
+  });
+  var deAnio2 = function (k) { return (AB[k] || []).filter(enAnio2); };
+  function puntosAloj() {
+    var f = [];
+    Object.keys(AB).forEach(function (k) {
+      if (ERC[k] != null) return; // los que están en un edificio del Catastro se pintan en el propio edificio
+      var L = deAnio2(k).filter(function (a) { return !(a.parte && VER_V && deAnio(a.rc).length); }); if (!L.length) return;
+      var p = 0; L.forEach(function (a) { p += a.plz; });
+      var i = ERC[k], c = i != null && E ? [E.cx[i], E.cy[i]] : [L[0].lon, L[0].lat];
+      f.push({ type: 'Feature', properties: { k: k, p: p, n: L.length }, geometry: { type: 'Point', coordinates: c } });
+    });
+    f.sort(function (a, b) { return b.properties.p - a.properties.p; });
+    return { type: 'FeatureCollection', features: f };
+  }
+  function aplicarAloj() {
+    pintarPanel();
+    if (popup) popup.remove();
+    repintar();
+  }
+  function listaAloj(k) {
+    var L = deAnio2(k).concat((PB[k] || []).filter(enAnio2));
+    if (!L.length) return '';
+    L = L.slice().sort(function (a, b) { return b.plz - a.plz; });
+    var html = '<div class="al"><h4><b class="num">' + L.length + '</b> ' + (L.length === 1 ? 'establecimiento inscrito' : 'establecimientos inscritos') + (ANIO2 ? ' ' + enTexto(ANIO2) : '') + '</h4><ul>';
+    L.forEach(function (a) {
+      var cat = a.cat && a.cat !== 'Única' ? ' ' + a.cat.toLowerCase() : '';
+      html += '<li><b>' + esc(a.nom || tipoAl(a)) + '</b>' + esc(tipoAl(a) + cat) + ' · <span class="num">' + fmt.format(a.plz) + '</span> plazas' + (a.ua ? ' · <span class="num">' + fmt.format(a.ua) + '</span> ' + (a.tipo === 'Apartamento turístico' ? 'apartamentos' : a.tipo === 'Establecimiento Hotelero' ? 'habitaciones' : 'unidades') : '') +
+        '<br><small>' + esc(a.dir) + '<br>' + esc(a.reg) + (a.f ? ' · inscrito el ' + FECHA(a.f) : '') + '</small></li>';
+    });
+    return html + '</ul></div>';
+  }
+  function abrirAloj(k, lngLat) {
+    var i = ERC[k], p0 = (AB[k] || [])[0];
+    if (p0 && p0.parte && ERC[p0.rc] != null) i = ERC[p0.rc];
+    if (i != null) return abrirFicha(i, lngLat);
+    var html = '<div class="pop" style="--c:var(--al)"><span class="uso">Alojamiento turístico</span>' + listaAloj(k).replace('class="al"', 'class="al" style="border:0;margin:0;padding:0"') + '</div>';
+    if (popup) popup.remove();
+    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map);
+  }
+  function botonVer(b, ver, que) { b.textContent = ver ? 'Ocultar' : 'Mostrar'; b.classList.toggle('oculto', !ver); b.setAttribute('aria-label', (ver ? 'Ocultar ' : 'Mostrar ') + que + ' en el mapa'); }
+  $('verVut').addEventListener('click', function () { VER_V = !VER_V; botonVer(this, VER_V, 'las viviendas turísticas'); if (popup) popup.remove(); repintar(); });
+  $('verAl').addEventListener('click', function () { VER_A = !VER_A; botonVer(this, VER_A, 'los hoteles, hostales y similares'); if (popup) popup.remove(); repintar(); });
+
+  // Viviendas cuyo edificio no aparece en el Catastro: se dibujan como puntos
+  function puntosSueltos() {
+    var vistos = {}, f = [];
+    V.forEach(function (v) { if (v.ed != null || vistos[v.rc] || !enAnio(v)) return; vistos[v.rc] = 1;
+      f.push({ type: 'Feature', properties: { rc: v.rc, t: deAnio(v.rc).length }, geometry: { type: 'Point', coordinates: [v.lon, v.lat] } }); });
+    return { type: 'FeatureCollection', features: f };
+  }
+
+  if (!window.maplibregl) { $('resumen').textContent = 'No se ha podido cargar el mapa. Recarga la página.'; return; }
+
+  // ---------- Mapa base (el mismo que el mapa de movilidad) ----------
+  var VECTOR = 'https://tiles.openfreemap.org/styles/liberty';
+  var es3D = false;
+  function estiloPlano() {
+    var base = new URL('tiles/', location.href).href;
+    return { version: 8, sources: {
+        general: { type: 'raster', tiles: [base + '{z}/{x}/{y}.png'], tileSize: 256, minzoom: 11, maxzoom: 13, attribution: 'OpenFreeMap © OpenMapTiles, datos de OpenStreetMap' },
+        detalle: { type: 'raster', tiles: [base + '{z}/{x}/{y}.png'], tileSize: 256, minzoom: 14, maxzoom: 15, bounds: [-4.504, 36.668, -4.329, 36.756] } },
+      layers: [{ id: 'fondo', type: 'background', paint: { 'background-color': css('--bg') } },
+        { id: 'general', type: 'raster', source: 'general', paint: { 'raster-saturation': -1, 'raster-brightness-min': .12 } },
+        { id: 'detalle', type: 'raster', source: 'detalle', minzoom: 13.5, paint: { 'raster-saturation': -1, 'raster-brightness-min': .12 } }] };
+  }
+  function cargarEstilo() {
+    return fetch(VECTOR, { signal: AbortSignal.timeout ? AbortSignal.timeout(7000) : undefined })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (st) {
+        // Los edificios de OpenStreetMap se quitan: aquí los dibujan los del Catastro.
+        st.layers = st.layers.filter(function (l) { return l.type !== 'fill-extrusion' && l['source-layer'] !== 'building' && l['source-layer'] !== 'poi'; });
+        st.layers.forEach(function (l) {
+          if (l['source-layer'] === 'water_name') l.filter = ['all', l.filter || true, ['!=', ['get', 'class'], 'lake']];
+          // Calles en blanco y gris para que no se confundan con los colores de los usos
+          if (l['source-layer'] === 'transportation' && l.type === 'line') {
+            l.paint = l.paint || {};
+            l.paint['line-color'] = /casing/.test(l.id) ? '#cfd7da' : (/rail|transit|ferry|aerialway/.test(l.id) ? '#b9c2c6' : '#ffffff');
+          }
+          if (l['source-layer'] === 'transportation_name' && l.paint) { l.paint['text-color'] = '#56636b'; }
+        });
+        es3D = true; return st;
+      })
+      .catch(function () { es3D = false; return estiloPlano(); });
+  }
+
+  var SATELITE = 'https://www.ign.es/wmts/pnoa-ma?request=GetTile&service=WMTS&version=1.0.0&layer=OI.OrthoimageCoverage' +
+    '&style=default&tilematrixset=GoogleMapsCompatible&format=image/jpeg&tilematrix={z}&tilerow={y}&tilecol={x}';
+  var capasBase = null;
+  function verSatelite(si) {
+    if (!capasBase) return;
+    if (!map.getSource('satelite')) map.addSource('satelite', { type: 'raster', tiles: [SATELITE], tileSize: 256, maxzoom: 19, attribution: 'PNOA cedido por © IGN' });
+    if (!map.getLayer('satelite')) {
+      var primeraSimbolo = capasBase.filter(function (c) { return c.type === 'symbol'; })[0];
+      map.addLayer({ id: 'satelite', type: 'raster', source: 'satelite', layout: { visibility: 'none' } }, primeraSimbolo && primeraSimbolo.id);
+    }
+    map.setLayoutProperty('satelite', 'visibility', si ? 'visible' : 'none');
+    capasBase.forEach(function (c) { if (c.type !== 'symbol' && map.getLayer(c.id)) map.setLayoutProperty(c.id, 'visibility', si ? 'none' : c.vis); });
+    $('creditoSat').hidden = !si;
+  }
+
+  var map, popup = null, en3D = false;
+  var VISTA = { center: [-4.44, 36.72], zoom: 12.4, pitch: 0, bearing: 0, pitch3D: 50, bearing3D: -12 };
+  var colorUso = ['match', ['get', 'u']]; USOS.forEach(function (u) { colorUso.push(u.id, u.c); }); colorUso.push(css('--u-x'));
+  function altura() { return en3D ? ['get', 'h'] : 0; }
+  var colorVut = ['case', ['>', ['coalesce', ['feature-state', 'a'], 0], 0], css('--al'),
+    ['step', ['coalesce', ['feature-state', 't'], ['get', 't']], css('--vt-0'), 1, css('--vt-1'), 2, css('--vt-2'), 5, css('--vt-3'), 20, css('--vt-4')]];
+  function pintarModo() {
+    if (!map || !map.getLayer('edificios')) return;
+    var vt = modo === 'vut';
+    map.setPaintProperty('edificios', 'fill-extrusion-color', vt ? colorVut : colorUso);
+    map.setLayoutProperty('vut-puntos', 'visibility', vt ? 'visible' : 'none');
+    filtrar();
+  }
+
+  Promise.all([cargarEstilo(), datos.catch(function () { return null; }), alCargado]).then(function (res) {
+    var estilo = res[0], gj = res[1];
+    map = new maplibregl.Map({ container: 'map', style: estilo, center: VISTA.center, zoom: VISTA.zoom, pitch: 0, bearing: 0,
+      minZoom: es3D ? 9 : 11, maxZoom: es3D ? 19 : 16.5, maxPitch: 70,
+      maxBounds: es3D ? [[-5.2, 36.4], [-3.9, 37.0]] : [[-4.66, 36.6], [-4.26, 36.84]],
+      attributionControl: false,
+      locale: { 'GeolocateControl.FindMyLocation': 'Mi ubicación', 'GeolocateControl.LocationNotAvailable': 'Ubicación no disponible',
+        'NavigationControl.ZoomIn': 'Acercar', 'NavigationControl.ZoomOut': 'Alejar', 'NavigationControl.ResetBearing': 'Orientar al norte' } });
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+    map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true, fitBoundsOptions: { maxZoom: 17 } }), 'bottom-right');
+    map.addControl({ onAdd: function () {
+        var d = document.createElement('div'); d.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+        d.innerHTML = '<button id="satelite" type="button" title="Cambiar entre el mapa y la vista satélite" aria-pressed="false">Satélite</button>';
+        d.firstChild.addEventListener('click', function () {
+          if (!capasBase) return;
+          var si = this.getAttribute('aria-pressed') !== 'true';
+          verSatelite(si); this.setAttribute('aria-pressed', si); this.textContent = si ? 'Mapa' : 'Satélite';
+        });
+        return d; }, onRemove: function () {} }, 'bottom-right');
+
+    map.on('load', function () {
+      capasBase = map.getStyle().layers.map(function (l) { return { id: l.id, type: l.type, vis: (l.layout && l.layout.visibility) || 'visible' }; });
+      if (!gj) { $('resumen').textContent = 'No se han podido cargar los edificios del Catastro. Recarga la página.'; return; }
+      var primeraSimbolo = capasBase.filter(function (c) { return c.type === 'symbol'; })[0];
+      map.addSource('catastro', { type: 'geojson', data: gj, attribution: 'Edificios: © Dirección General del Catastro' });
+      map.addLayer({ id: 'edificios', type: 'fill-extrusion', source: 'catastro',
+        paint: { 'fill-extrusion-color': colorUso, 'fill-extrusion-height': altura(), 'fill-extrusion-opacity': .9 } }, primeraSimbolo && primeraSimbolo.id);
+      // Contorno fino al acercarse, para distinguir edificios contiguos del mismo uso
+      map.addLayer({ id: 'contorno', type: 'line', source: 'catastro', minzoom: 15.5,
+        paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 15.5, 0.3, 18, 1.1], 'line-opacity': .8 } }, primeraSimbolo && primeraSimbolo.id);
+      map.addSource('vutSueltas', { type: 'geojson', data: puntosSueltos() });
+      map.addLayer({ id: 'vut-puntos', type: 'circle', source: 'vutSueltas', layout: { visibility: 'none' },
+        paint: { 'circle-color': css('--vt-3'), 'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2.5, 17, 6], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.2 } });
+      crearRayas();
+      map.addSource('mixto', { type: 'geojson', data: VACIO });
+      map.addLayer({ id: 'mixto', type: 'fill-extrusion', source: 'mixto',
+        paint: { 'fill-extrusion-pattern': ['concat', 'rayas-', ['to-string', ['get', 'lvl']]], 'fill-extrusion-height': altura(), 'fill-extrusion-opacity': .9 } }, 'contorno');
+      map.on('click', 'mixto', function (e) { var f = e.features && e.features[0]; if (f && !e.defaultPrevented) { e.preventDefault(); abrirFicha(f.id, e.lngLat); } });
+      map.on('mouseenter', 'mixto', function () { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'mixto', function () { map.getCanvas().style.cursor = ''; });
+      map.addSource('aloj', { type: 'geojson', data: puntosAloj() });
+      map.addLayer({ id: 'aloj', type: 'circle', source: 'aloj',
+        paint: { 'circle-color': css('--al'), 'circle-opacity': .85, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 2, 3.2, 3, 10, 5, 22.4, 9], 16, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 4, 3.2, 5, 10, 8, 22.4, 13]] } });
+      map.on('click', 'aloj', function (e) { var f = e.features && e.features[0]; if (f) { e.preventDefault(); abrirAloj(f.properties.k, e.lngLat); } });
+      map.on('mouseenter', 'aloj', function () { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'aloj', function () { map.getCanvas().style.cursor = ''; });
+      map.on('click', 'vut-puntos', function (e) { var f = e.features && e.features[0]; if (f && !e.defaultPrevented) { e.preventDefault(); abrirVut(f.properties.rc, e.lngLat); } });
+      map.on('mouseenter', 'vut-puntos', function () { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'vut-puntos', function () { map.getCanvas().style.cursor = ''; });
+      pintarPanel(); pintarModo(); repintar();
+      map.on('click', 'edificios', function (e) { if (e.defaultPrevented) return; var f = e.features && e.features[0]; if (f) abrirFicha(f.id, e.lngLat); });
+      map.on('mouseenter', 'edificios', function () { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'edificios', function () { map.getCanvas().style.cursor = ''; });
+    });
+  });
+
+  function filtrar() {
+    if (!map || !map.getLayer('edificios')) return;
+    var sel = USOS.filter(function (u) { return activos[u.id]; }).map(function (u) { return u.id; });
+    var f = sel.length === USOS.length || modo === 'vut' ? null : ['in', ['get', 'u'], ['literal', sel]];
+    map.setFilter('edificios', f); map.setFilter('contorno', f);
+    if (popup) popup.remove();
+  }
+
+  var FECHA = function (f) { return f && f.length === 8 ? f.slice(6, 8) + '/' + f.slice(4, 6) + '/' + f.slice(0, 4) : ''; };
+  function listaVut(rc, enEdificio) {
+    var L = deAnio(rc), nota = ANIO ? '<div class="filtro">Solo se muestran las inscritas en ' + ANIO + ' (' + (VB[rc] || []).length + ' en total). Elige «Todos los años» para verlas todas.</div>' : '';
+    if (!L.length) return enEdificio ? '<div class="vt"><div class="sin"><b>0 viviendas turísticas inscritas' + (ANIO ? ' en ' + ANIO : '') + '</b> en este edificio en el Registro de Turismo de Andalucía.</div>' + nota + '</div>' : '';
+    L = L.slice().sort(function (a, b) { return a.dir.localeCompare(b.dir, 'es') || a.pl.localeCompare(b.pl, 'es', { numeric: true }) || a.pt.localeCompare(b.pt, 'es', { numeric: true }); });
+    var html = '<div class="vt"><h4><b class="num">' + L.length + '</b> ' + (L.length === 1 ? 'vivienda turística inscrita' : 'viviendas turísticas inscritas') + (ANIO ? ' en ' + ANIO : '') + '</h4><ul>', dir = null;
+    L.forEach(function (v) {
+      if (v.dir !== dir) { dir = v.dir; html += '<li class="dir">' + esc(dir) + '</li>'; }
+      var donde = [v.bl, v.pl ? (/^\d+$/.test(v.pl) ? 'planta ' + v.pl : v.pl.toLowerCase()) : '', v.pt ? 'puerta ' + v.pt : ''].filter(Boolean).join(' · ') || 'vivienda completa';
+      html += '<li><span>' + esc(donde.charAt(0).toUpperCase() + donde.slice(1)) + '<br><small>VUT/MA/' + esc(v.reg) + ' · ' + (v.m === 'h' ? 'por habitaciones · ' : '') + v.plz + ' plazas</small></span><small class="num">' + FECHA(v.f) + '</small></li>';
+    });
+    return html + '</ul>' + nota + '</div>';
+  }
+  function abrirVut(rc, lngLat) {
+    var html = '<div class="pop" style="--c:var(--vt-3)"><span class="uso">Vivienda turística</span>' + listaVut(rc, false).replace('class="vt"', 'class="vt" style="border:0;margin:0"') + '</div>';
+    if (popup) popup.remove();
+    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map);
+  }
+  function portalesDe(rc) {
+    var ks = (P.porRc && P.porRc[rc]) || [];
+    if (!ks.length) return '';
+    return '<div class="dirs">' + ks.slice(0, 6).map(function (k) { return esc(S[P[k].s]) + ', ' + esc(P[k].num); }).join('<br>') + (ks.length > 6 ? '<br><small>y ' + (ks.length - 6) + ' portales más</small>' : '') + '</div>';
+  }
+  function abrirPortal(rc, dir, lngLat) {
+    var n = deAnio(rc).length, hayAl = listaAloj(rc) !== '';
+    var html = '<div class="pop" style="--c:' + (n ? css('--vt-3') : hayAl ? css('--al') : css('--muted')) + '"><span class="uso">' + (n ? (hayAl ? 'Viviendas turísticas y hotel, hostal o similar' : 'Con viviendas turísticas') : hayAl ? 'Hotel, hostal o similar' : ANIO ? 'Ninguna inscrita en ' + ANIO : 'Sin viviendas turísticas inscritas') + '</span>' +
+      '<div class="dirs">' + esc(dir) + '</div>' + listaVut(rc, !hayAl).replace('class="vt"', 'class="vt" style="border:0;padding-top:0"') + listaAloj(rc) + '</div>';
+    if (popup) popup.remove();
+    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map);
+  }
+  function abrirFicha(i, lngLat) {
+    var ref = E.r[i];
+    var sede = 'https://www1.sedecatastro.gob.es/CYCBienInmueble/OVCListaBienes.aspx?rc1=' + encodeURIComponent(ref.slice(0, 7)) + '&rc2=' + encodeURIComponent(ref.slice(7, 14));
+    var n = deAnio(ref).length, hayAl = listaAloj(ref) !== '';
+    var html = '<div class="pop" style="--c:' + (n ? css('--vt-3') : hayAl ? css('--al') : css('--muted')) + '"><span class="uso">' + (n ? (hayAl ? 'Viviendas turísticas y hotel, hostal o similar' : 'Con viviendas turísticas') : hayAl ? 'Hotel, hostal o similar' : ANIO ? 'Ninguna inscrita en ' + ANIO : 'Sin viviendas turísticas inscritas') + '</span>' +
+      portalesDe(ref) + listaVut(ref, !hayAl).replace('class="vt"', 'class="vt" style="border:0;padding-top:0"') + listaAloj(ref) +
+      '<div class="note">Según el Catastro: uso ' + USO[E.u[i]].nombre.toLowerCase() + (E.v[i] ? ', ' + fmt.format(E.v[i]) + (E.v[i] === 1 ? ' vivienda' : ' viviendas') : ', sin viviendas') +
+      (E.u[i] !== 'r' && E.v[i] ? '. La parcela mezcla viviendas y otros usos.' : '') + '<br>Ref. catastral ' + esc(ref) + ' · <a href="' + sede + '" target="_blank" rel="noopener">Ver en la Sede del Catastro</a></div></div>';
+    if (popup) popup.remove();
+    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map);
+  }
+
+})();
+</script>
