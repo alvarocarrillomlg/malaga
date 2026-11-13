@@ -606,7 +606,7 @@ html, body { touch-action: manipulation; }
   // alojamientos.txt: ref. catastral del edificio|lon|lat|tipo|grupo|categoría|modalidad|nº registro|fecha|nombre|dirección|CP|plazas|unidades
   var AL = [], AB = {}, PB = {}, ALP = 0; // PB: establecimientos que ocupan solo una parte de un edificio grande, por edificio
   function tipoAl(a) {
-    if (a.tipo === 'Apartamento turístico') return 'Edificio turístico';
+    if (a.tipo === 'Apartamento turístico') return a.grupo === 'Conjunto' ? 'Conjunto turístico' : 'Edificio turístico';
     if (a.tipo === 'Vivienda turística de alojamiento rural') return 'Vivienda turística rural';
     if (a.tipo === 'Casa rural') return 'Casa rural';
     if (a.tipo === 'Campamento de turismo') return a.grupo || 'Campamento de turismo';
@@ -619,7 +619,7 @@ html, body { touch-action: manipulation; }
     { n: 'Hoteles de 4 estrellas', f: function (a) { return esHotel(a) && estrellas(a) === 4; } },
     { n: 'Hoteles de 3 estrellas o menos', f: function (a) { return esHotel(a) && estrellas(a) <= 3; } },
     { n: 'Hostales y pensiones', f: function (a) { return a.grupo === 'Hostal' || a.grupo === 'Pensión'; } },
-    { n: 'Edificios turísticos', f: function (a) { return a.tipo === 'Apartamento turístico'; } },
+    { n: 'Edificio/conjunto turístico', f: function (a) { return a.tipo === 'Apartamento turístico'; } },
     { n: 'Albergues', f: function (a) { return a.grupo === 'Albergue'; } },
     { n: 'Alojamiento rural', f: function (a) { return a.tipo === 'Casa rural' || a.tipo === 'Vivienda turística de alojamiento rural'; } },
     { n: 'Áreas de autocaravanas', sinPlazas: true, f: function (a) { return a.tipo === 'Campamento de turismo'; } }
