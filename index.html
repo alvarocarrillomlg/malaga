@@ -868,6 +868,12 @@ html, body { touch-action: manipulation; }
     map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true, fitBoundsOptions: { maxZoom: 17 } }), 'bottom-right');
     map.addControl({ onAdd: function () {
         var d = document.createElement('div'); d.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+        d.innerHTML = '<button id="zonaBtn" type="button" aria-pressed="false" title="Dibuja una zona en el mapa para contar lo que hay dentro">Dibujar zona</button>';
+        d.firstChild.addEventListener('click', function () { if (DIB) cancelarZona(); else empezarZona(); });
+        return d; }, onRemove: function () {} }, 'bottom-right');
+
+    map.addControl({ onAdd: function () {
+        var d = document.createElement('div'); d.className = 'maplibregl-ctrl maplibregl-ctrl-group';
         d.innerHTML = '<button id="vista" type="button" title="Cambiar entre la vista en 3D y el plano en 2D">2D</button><button id="satelite" type="button" title="Cambiar entre el mapa y la vista satélite" aria-pressed="false">Satélite</button>';
         d.lastChild.addEventListener('click', function () {
           if (!capasBase) return;
@@ -876,12 +882,6 @@ html, body { touch-action: manipulation; }
         });
         d.firstChild.addEventListener('click', function () { cambiar3D(!en3D); });
         return d; }, onRemove: function () {} }, 'bottom-right');
-    map.addControl({ onAdd: function () {
-        var d = document.createElement('div'); d.className = 'maplibregl-ctrl maplibregl-ctrl-group';
-        d.innerHTML = '<button id="zonaBtn" type="button" aria-pressed="false" title="Dibuja una zona en el mapa para contar lo que hay dentro">Dibujar zona</button>';
-        d.firstChild.addEventListener('click', function () { if (DIB) cancelarZona(); else empezarZona(); });
-        return d; }, onRemove: function () {} }, 'bottom-right');
-
     map.on('load', function () {
       capasBase = map.getStyle().layers.map(function (l) { return { id: l.id, type: l.type, vis: (l.layout && l.layout.visibility) || 'visible' }; });
       if (!gj) { $('resumen').textContent = 'No se han podido cargar los edificios del Catastro. Recarga la página.'; return; }
