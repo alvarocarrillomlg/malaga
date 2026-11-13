@@ -605,9 +605,9 @@ html, body { touch-action: manipulation; }
   var esHotel = function (a) { return /^Hotel/.test(a.grupo) && a.tipo === 'Establecimiento Hotelero'; };
   var estrellas = function (a) { var m = /(\d)\s*Estrella/i.exec(a.cat); return m ? +m[1] : 0; };
   var GRUPOS = [
-    { n: 'Hoteles de 3 estrellas o menos', f: function (a) { return esHotel(a) && estrellas(a) <= 3; } },
-    { n: 'Hoteles de 4 estrellas', f: function (a) { return esHotel(a) && estrellas(a) === 4; } },
     { n: 'Hoteles de 5 estrellas', f: function (a) { return esHotel(a) && estrellas(a) === 5; } },
+    { n: 'Hoteles de 4 estrellas', f: function (a) { return esHotel(a) && estrellas(a) === 4; } },
+    { n: 'Hoteles de 3 estrellas o menos', f: function (a) { return esHotel(a) && estrellas(a) <= 3; } },
     { n: 'Hostales y pensiones', f: function (a) { return a.grupo === 'Hostal' || a.grupo === 'Pensión'; } },
     { n: 'Edificios turísticos', f: function (a) { return a.tipo === 'Apartamento turístico'; } },
     { n: 'Albergues', f: function (a) { return a.grupo === 'Albergue'; } },
