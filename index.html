@@ -307,7 +307,7 @@ html, body { touch-action: manipulation; }
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   // Versión de los datos: evita que el navegador use una copia antigua de los .txt tras una actualización
-  var VDATOS = '42';
+  var VDATOS = '43';
   var fmt = new Intl.NumberFormat('es-ES', { useGrouping: 'always' });
   var fmt1 = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
   var css = function (name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); };
@@ -817,7 +817,7 @@ html, body { touch-action: manipulation; }
       map.addSource('aloj', { type: 'geojson', data: puntosAloj() });
       map.addLayer({ id: 'aloj', type: 'circle', source: 'aloj',
         paint: { 'circle-color': css('--al'), 'circle-opacity': .85, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5,
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 3, 10, 4, 22.4, 6], 14, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 4.5, 10, 6, 22.4, 8.5], 17, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 5, 10, 6.5, 22.4, 9]] } });
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 3, 10, 4, 22.4, 6], 14, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 4.5, 10, 6, 22.4, 9], 16, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 6, 10, 9, 22.4, 15], 18, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 8, 10, 14, 22.4, 24]] } });
       map.on('click', 'aloj', function (e) { var f = e.features && e.features[0]; if (f) { e.preventDefault(); abrirAloj(f.properties.k, e.lngLat); } });
       map.on('mouseenter', 'aloj', function () { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'aloj', function () { map.getCanvas().style.cursor = ''; });
