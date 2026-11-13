@@ -68,10 +68,17 @@ button, input { font: inherit; color: inherit; }
 h1 { margin: 0; font-size: 21px; line-height: 1.12; font-weight: 700; letter-spacing: -.015em; text-wrap: balance; }
 h1 em { font-style: normal; color: var(--accent); }
 #resumen { color: var(--muted); font-size: 12.5px; margin-top: -4px; }
-#enCalle { position: absolute; z-index: 3; top: calc(14px + env(safe-area-inset-top, 0px)); left: calc(50% + 191px); transform: translateX(-50%); width: max-content; max-width: min(460px, calc(100% - 420px)); display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 14px; border-radius: 99px; background: var(--panel); border: 1.5px solid var(--accent); box-shadow: var(--shadow); font-size: 13px; color: var(--ink); }
-#enCalle[hidden] { display: none; }
-#enCalle span { flex: 1; min-width: 0; }
-#enCalle button { flex: none; height: 28px; padding: 0 11px; border: 0; border-radius: 99px; background: var(--accent); color: var(--on-color); font: 600 12.5px/1 var(--font); cursor: pointer; }
+#flota { position: absolute; z-index: 3; top: calc(14px + env(safe-area-inset-top, 0px)); left: calc(50% + 191px); transform: translateX(-50%); width: max-content; max-width: min(480px, calc(100% - 420px)); display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+#flota > div { pointer-events: auto; display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 14px; border-radius: 99px; background: var(--panel); border: 1.5px solid var(--accent); box-shadow: var(--shadow); font-size: 13px; color: var(--ink); }
+#zona { border-radius: 16px !important; }
+#zona button.sec2 { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); }
+#zona button:disabled { opacity: .45; cursor: default; }
+#zona b { color: var(--accent); }
+.maplibregl-ctrl-group button#zonaBtn { width: auto; height: 29px; padding: 0 10px; font: 600 12px/1 var(--font); color: #333; white-space: nowrap; }
+.maplibregl-ctrl-group button#zonaBtn[aria-pressed="true"] { background: var(--accent); color: var(--on-color); }
+#enCalle[hidden], #zona[hidden] { display: none !important; }
+#enCalle span, #zona span { flex: 1; min-width: 0; line-height: 1.35; }
+#enCalle button, #zona button { flex: none; height: 28px; padding: 0 11px; border: 0; border-radius: 99px; background: var(--accent); color: var(--on-color); font: 600 12.5px/1 var(--font); cursor: pointer; }
 #resumen b { color: var(--ink); font-weight: 600; }
 
 /* Barra: reparto de los m² construidos entre usos, a escala */
@@ -250,7 +257,9 @@ html, body { touch-action: manipulation; }
   #abrir { top: auto; bottom: calc(32px + env(safe-area-inset-bottom, 0px)); left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); width: auto; height: 30px; }
   #abrir svg { transform: none; }
   #creditos { left: max(10px, env(safe-area-inset-left, 0px)); max-width: calc(100% - 20px); font-size: 9.5px; }
-  #enCalle { left: max(10px, env(safe-area-inset-left, 0px)); right: 150px; transform: none; width: auto; max-width: none; border-radius: 14px; font-size: 12.5px; flex-direction: column; align-items: stretch; gap: 7px; padding: 9px 10px; }
+  #flota { left: max(10px, env(safe-area-inset-left, 0px)); right: 150px; transform: none; width: auto; max-width: none; }
+  #flota > div { border-radius: 14px; font-size: 12.5px; flex-direction: column; align-items: stretch; gap: 7px; padding: 9px 10px; }
+  #zona .bots { display: flex; gap: 6px; } #zona .bots button { flex: 1; }
   #enCalle span { line-height: 1.3; }
   .maplibregl-ctrl-bottom-right { top: calc(14px + env(safe-area-inset-top, 0px)); bottom: auto; }
 }
@@ -296,7 +305,10 @@ html, body { touch-action: manipulation; }
     <button id="mini" class="franja" type="button" aria-label="Minimizar el panel" title="Minimizar el panel para ver todo el mapa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
   </section>
 
-  <div id="enCalle" role="status" hidden><span id="enCalleT"></span><button type="button" id="quitarCalle">Ver toda la ciudad</button></div>
+  <div id="flota">
+    <div id="enCalle" role="status" hidden><span id="enCalleT"></span><button type="button" id="quitarCalle">Ver toda la ciudad</button></div>
+    <div id="zona" role="status" aria-live="polite" hidden></div>
+  </div>
   <div id="creditos">Edificios: <a href="https://www.catastro.hacienda.gob.es/webinspire/index.html" target="_blank" rel="noopener">Dirección General del Catastro</a> · Viviendas turísticas: <a href="https://www.juntadeandalucia.es/datosabiertos/portal/dataset/openrta" target="_blank" rel="noopener">Junta de Andalucía</a> · Mapa: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org" target="_blank" rel="noopener">OpenMapTiles</a>, datos de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a><span id="creditoSat" hidden> · Ortofoto: PNOA cedido por © <a href="https://www.ign.es" target="_blank" rel="noopener">IGN</a></span></div>
   <button id="abrir" class="franja" type="button" aria-label="Mostrar el panel" title="Mostrar el panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
 </div>
@@ -353,6 +365,7 @@ html, body { touch-action: manipulation; }
       else R = 'Las dos secciones están desactivadas. Pulsa «Activar» en una de ellas para verla en el mapa.';
       if (ENCALLE && (VER_V || VER_A)) R = R.replace(' en el municipio', ' en ' + esc(CALLE_N));
       $('resumen').innerHTML = R;
+      if (ZONA) pintarZona();
     }
   }
   // ---------- Buscador: todas las calles y portales del callejero del Catastro ----------
@@ -706,6 +719,73 @@ html, body { touch-action: manipulation; }
     VER_A = on; botonVer(this, VER_A); $('aloj').classList.toggle('apagada', !VER_A); if (popup) popup.remove();
     if (VER_A) { TSEL = {}; if (FA.texto) FA.cambiar(null); else { FA.pintar(); aplicarAloj(); } } else { FA.pintar(); pintarPanel(); repintar(); } });
 
+  // ---------- Zona dibujada por el usuario: cuenta lo que hay dentro (con los filtros activos) ----------
+  var DIB = null, ZONA = null;
+  function dentroPol(x, y, pol) {
+    var d = false;
+    for (var i = 0, j = pol.length - 1; i < pol.length; j = i++) {
+      var xi = pol[i][0], yi = pol[i][1], xj = pol[j][0], yj = pol[j][1];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) d = !d;
+    }
+    return d;
+  }
+  function empezarZona() {
+    if (!map) return;
+    DIB = []; ZONA = null; if (popup) popup.remove();
+    map.doubleClickZoom.disable(); map.getCanvas().style.cursor = 'crosshair';
+    $('zonaBtn').setAttribute('aria-pressed', 'true'); $('zonaBtn').textContent = 'Cancelar zona';
+    if (innerWidth <= 720) $('app').classList.add('mini');
+    pintarZona();
+  }
+  function cancelarZona() {
+    DIB = null; ZONA = null; map.doubleClickZoom.enable(); map.getCanvas().style.cursor = '';
+    $('zonaBtn').setAttribute('aria-pressed', 'false'); $('zonaBtn').textContent = 'Dibujar zona';
+    pintarZona();
+  }
+  function cerrarZona() {
+    if (!DIB || DIB.length < 3) return;
+    ZONA = DIB.slice(); DIB = null; map.doubleClickZoom.enable(); map.getCanvas().style.cursor = '';
+    $('zonaBtn').setAttribute('aria-pressed', 'false'); $('zonaBtn').textContent = 'Dibujar zona';
+    pintarZona();
+  }
+  function contarZona() {
+    var nv = 0, pv = 0, na = 0, pa = 0;
+    if (VER_V) V.forEach(function (v) { if (v.lon != null && enAnio(v) && dentroPol(v.lon, v.lat, ZONA)) { nv++; pv += v.plz; } });
+    if (VER_A) AL.forEach(function (a) {
+      if (!enAnio2(a)) return;
+      var i = !a.parte && a.rc ? ERC[a.rc] : null, x = i != null ? E.cx[i] : a.lon, y = i != null ? E.cy[i] : a.lat;
+      if (dentroPol(x, y, ZONA)) { na++; pa += a.plz; }
+    });
+    return { nv: nv, pv: pv, na: na, pa: pa };
+  }
+  function pintarZona() {
+    var z = $('zona'), f = [];
+    if (DIB) {
+      DIB.forEach(function (c) { f.push({ type: 'Feature', geometry: { type: 'Point', coordinates: c } }); });
+      if (DIB.length > 1) f.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: DIB } });
+      z.hidden = false;
+      z.innerHTML = '<span>' + (DIB.length ? 'Sigue marcando puntos. Para cerrar la zona, pulsa el primer punto o «Terminar».' : 'Pulsa en el mapa para marcar los puntos de tu zona.') + '</span><div class="bots">' +
+        '<button type="button" id="zTerminar"' + (DIB.length < 3 ? ' disabled' : '') + '>Terminar</button>' +
+        (DIB.length ? '<button type="button" class="sec2" id="zDeshacer">Deshacer</button>' : '') + '<button type="button" class="sec2" id="zCancelar">Cancelar</button></div>';
+    } else if (ZONA) {
+      var anillo = ZONA.concat([ZONA[0]]);
+      f.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [anillo] } });
+      var r = contarZona(), fil = (VER_V && ANIO) || (VER_A && (ANIO2 || Object.keys(TSEL).length)) || ENCALLE;
+      z.hidden = false;
+      z.innerHTML = '<span>En tu zona hay <b class="num">' + fmt.format(r.pv + r.pa) + '</b> plazas turísticas' + (fil ? ' (con los filtros elegidos)' : '') + ': ' +
+        (VER_V ? '<b class="num">' + fmt.format(r.nv) + '</b> viviendas turísticas con ' + fmt.format(r.pv) + ' plazas' : '') + (VER_V && VER_A ? ' y ' : '') +
+        (VER_A ? '<b class="num">' + fmt.format(r.na) + '</b> hoteles, hostales y similares con ' + fmt.format(r.pa) + ' plazas' : '') + '.</span>' +
+        '<div class="bots"><button type="button" class="sec2" id="zBorrar">Borrar zona</button></div>';
+    } else { z.hidden = true; z.innerHTML = ''; }
+    if (map && map.getSource('zona')) map.getSource('zona').setData({ type: 'FeatureCollection', features: f });
+  }
+  $('zona').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'zTerminar') cerrarZona();
+    else if (b.id === 'zDeshacer') { DIB.pop(); pintarZona(); }
+    else if (b.id === 'zCancelar' || b.id === 'zBorrar') cancelarZona();
+  });
+
   // Viviendas cuyo edificio no aparece en el Catastro: se dibujan como puntos
   function puntosSueltos() {
     var vistos = {}, f = [];
@@ -794,6 +874,11 @@ html, body { touch-action: manipulation; }
         });
         d.firstChild.addEventListener('click', function () { cambiar3D(!en3D); });
         return d; }, onRemove: function () {} }, 'bottom-right');
+    map.addControl({ onAdd: function () {
+        var d = document.createElement('div'); d.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+        d.innerHTML = '<button id="zonaBtn" type="button" aria-pressed="false" title="Dibuja una zona en el mapa para contar lo que hay dentro">Dibujar zona</button>';
+        d.firstChild.addEventListener('click', function () { if (DIB) cancelarZona(); else empezarZona(); });
+        return d; }, onRemove: function () {} }, 'bottom-right');
 
     map.on('load', function () {
       capasBase = map.getStyle().layers.map(function (l) { return { id: l.id, type: l.type, vis: (l.layout && l.layout.visibility) || 'visible' }; });
@@ -812,23 +897,33 @@ html, body { touch-action: manipulation; }
       map.addSource('mixto', { type: 'geojson', data: VACIO });
       map.addLayer({ id: 'mixto', type: 'fill-extrusion', source: 'mixto',
         paint: { 'fill-extrusion-pattern': ['concat', 'rayas-', ['to-string', ['get', 'lvl']]], 'fill-extrusion-height': altura(), 'fill-extrusion-opacity': .9 } }, 'contorno');
-      map.on('click', 'mixto', function (e) { var f = e.features && e.features[0]; if (f && !e.defaultPrevented) { e.preventDefault(); abrirFicha(f.id, e.lngLat); } });
+      map.on('click', 'mixto', function (e) { if (DIB) return; var f = e.features && e.features[0]; if (f && !e.defaultPrevented) { e.preventDefault(); abrirFicha(f.id, e.lngLat); } });
       map.on('mouseenter', 'mixto', function () { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'mixto', function () { map.getCanvas().style.cursor = ''; });
       map.addSource('aloj', { type: 'geojson', data: puntosAloj() });
       map.addLayer({ id: 'aloj', type: 'circle', source: 'aloj',
         paint: { 'circle-color': css('--al'), 'circle-opacity': .85, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5,
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 3, 10, 4, 22.4, 6], 14, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 4.5, 10, 6, 22.4, 9], 16, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 6, 10, 9, 22.4, 15], 18, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 8, 10, 14, 22.4, 24]] } });
-      map.on('click', 'aloj', function (e) { var f = e.features && e.features[0]; if (f) { e.preventDefault(); abrirAloj(f.properties.k, e.lngLat); } });
+      map.on('click', 'aloj', function (e) { if (DIB) return; var f = e.features && e.features[0]; if (f) { e.preventDefault(); abrirAloj(f.properties.k, e.lngLat); } });
       map.on('mouseenter', 'aloj', function () { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'aloj', function () { map.getCanvas().style.cursor = ''; });
-      map.on('click', 'vut-puntos', function (e) { var f = e.features && e.features[0]; if (f && !e.defaultPrevented) { e.preventDefault(); abrirVut(f.properties.rc, e.lngLat); } });
+      map.on('click', 'vut-puntos', function (e) { if (DIB) return; var f = e.features && e.features[0]; if (f && !e.defaultPrevented) { e.preventDefault(); abrirVut(f.properties.rc, e.lngLat); } });
       map.on('mouseenter', 'vut-puntos', function () { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'vut-puntos', function () { map.getCanvas().style.cursor = ''; });
+      map.addSource('zona', { type: 'geojson', data: VACIO });
+      map.addLayer({ id: 'zona-relleno', type: 'fill', source: 'zona', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': css('--accent'), 'fill-opacity': .12 } });
+      map.addLayer({ id: 'zona-linea', type: 'line', source: 'zona', filter: ['!=', ['geometry-type'], 'Point'], paint: { 'line-color': css('--accent'), 'line-width': 2.5 } });
+      map.addLayer({ id: 'zona-puntos', type: 'circle', source: 'zona', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#ffffff', 'circle-stroke-color': css('--accent'), 'circle-stroke-width': 2.5 } });
+      map.on('click', function (e) {
+        if (!DIB) return;
+        var P0 = DIB[0];
+        if (DIB.length >= 3 && P0) { var a = map.project(P0), b = e.point; if (Math.hypot(a.x - b.x, a.y - b.y) < 14) { cerrarZona(); return; } }
+        DIB.push([e.lngLat.lng, e.lngLat.lat]); pintarZona();
+      });
       pintarPanel(); repintar(); abrirDesdeEnlace(); cargarDir();
       // Solo se pueden pulsar los edificios con algo inscrito (con los filtros y capas activos)
       var tiene = function (i) { var st = map.getFeatureState({ source: 'catastro', id: i }); return (st.t || 0) > 0 || (st.a || 0) > 0; };
-      map.on('click', 'edificios', function (e) { if (e.defaultPrevented) return; var f = e.features && e.features[0]; if (f && tiene(f.id)) abrirFicha(f.id, e.lngLat); });
+      map.on('click', 'edificios', function (e) { if (DIB) return; if (e.defaultPrevented) return; var f = e.features && e.features[0]; if (f && tiene(f.id)) abrirFicha(f.id, e.lngLat); });
       map.on('mousemove', 'edificios', function (e) { var f = e.features && e.features[0]; map.getCanvas().style.cursor = f && tiene(f.id) ? 'pointer' : ''; });
       map.on('mouseleave', 'edificios', function () { map.getCanvas().style.cursor = ''; });
     });
