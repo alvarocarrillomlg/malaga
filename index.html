@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Plazas turísticas en Málaga</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="description" content="Mapa de las viviendas turísticas, hoteles, hostales y alojamientos similares inscritos en el Registro de Turismo de Andalucía en el municipio de Málaga, edificio a edificio.">
 <meta property="og:title" content="Plazas turísticas en Málaga">
 <meta property="og:description" content="Viviendas turísticas, hoteles, hostales y similares inscritos en el municipio de Málaga, edificio a edificio. Elaborado por Álvaro Carrillo.">
@@ -111,6 +111,10 @@ h1 em { font-style: normal; color: var(--accent); }
 .esc { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); }
 .esc span { display: inline-flex; align-items: center; gap: 5px; }
 .esc i { width: 12px; height: 12px; border-radius: 3px; background: var(--c); display: inline-block; }
+/* La página no hace zoom al tocar el panel (iOS amplía los campos de menos de 16 px); el mapa sí se puede ampliar */
+html, body { touch-action: manipulation; }
+#panel { touch-action: pan-y; }
+#vq { font-size: 16px; }
 #vq { width: 100%; height: 36px; padding: 0 11px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; }
 #vres { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 240px; overflow-y: auto; }
 #vres button { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; text-align: left; padding: 7px 8px; background: none; border: 0; border-radius: 8px; cursor: pointer; }
