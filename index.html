@@ -875,7 +875,8 @@ html, body { touch-action: manipulation; }
   function portalesDe(rc) {
     var ks = (P.porRc && P.porRc[rc]) || [];
     if (!ks.length) return '';
-    return '<div class="dirs">' + ks.slice(0, 6).map(function (k) { return esc(S[P[k].s]) + ', ' + esc(P[k].num); }).join('<br>') + (ks.length > 6 ? '<br><small>y ' + (ks.length - 6) + ' portales más</small>' : '') + '</div>';
+    // Solo una dirección del edificio (la primera del Catastro), sin listar todos sus portales
+    return '<div class="dirs">' + esc(S[P[ks[0]].s]) + ', ' + esc(P[ks[0]].num) + '</div>';
   }
   function abrirPortal(rc, dir, lngLat) {
     var n = deAnio(rc).length, hayAl = listaAloj(rc) !== '';
