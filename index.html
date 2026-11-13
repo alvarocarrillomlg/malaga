@@ -794,7 +794,7 @@ html, body { touch-action: manipulation; }
         paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 15.5, 0.3, 18, 1.1], 'line-opacity': .8 } }, primeraSimbolo && primeraSimbolo.id);
       map.addSource('vutSueltas', { type: 'geojson', data: puntosSueltos() });
       map.addLayer({ id: 'vut-puntos', type: 'circle', source: 'vutSueltas',
-        paint: { 'circle-color': css('--vt-3'), 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 9, 14, 7, 17, 4.5], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5 } });
+        paint: { 'circle-color': css('--vt-3'), 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 4, 14, 5.5, 17, 5.5], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5 } });
       crearRayas();
       map.addSource('mixto', { type: 'geojson', data: VACIO });
       map.addLayer({ id: 'mixto', type: 'fill-extrusion', source: 'mixto',
@@ -805,7 +805,7 @@ html, body { touch-action: manipulation; }
       map.addSource('aloj', { type: 'geojson', data: puntosAloj() });
       map.addLayer({ id: 'aloj', type: 'circle', source: 'aloj',
         paint: { 'circle-color': css('--al'), 'circle-opacity': .85, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5,
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 9, 10, 12, 22.4, 18], 14, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 7, 10, 9, 22.4, 13], 17, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 4.5, 10, 6, 22.4, 8]] } });
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 3, 10, 4, 22.4, 6], 14, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 4.5, 10, 6, 22.4, 8.5], 17, ['interpolate', ['linear'], ['sqrt', ['get', 'p']], 0, 5, 10, 6.5, 22.4, 9]] } });
       map.on('click', 'aloj', function (e) { var f = e.features && e.features[0]; if (f) { e.preventDefault(); abrirAloj(f.properties.k, e.lngLat); } });
       map.on('mouseenter', 'aloj', function () { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'aloj', function () { map.getCanvas().style.cursor = ''; });
