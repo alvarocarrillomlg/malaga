@@ -120,7 +120,7 @@ h1 em { font-style: normal; color: var(--accent); }
 .pop .al { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 8px; }
 .pop .al h4 { margin: 0 0 6px; font-size: 13px; }
 .pop .al h4 b { color: var(--al); }
-.pop .al ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; max-height: 190px; overflow-y: auto; font-size: 12px; }
+.pop .al ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; font-size: 12px; }
 .pop .al li b { display: block; font-size: 12.5px; }
 .pop .al small { color: var(--muted); }
 .esc { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); }
@@ -212,7 +212,8 @@ html, body { touch-action: manipulation; }
 /* Icono de «Mi ubicación» en el verde del panel (mientras no está siguiendo al usuario) */
 .maplibregl-ctrl-geolocate:not(.maplibregl-ctrl-geolocate-active):not(.maplibregl-ctrl-geolocate-background):not(.maplibregl-ctrl-geolocate-active-error):not(.maplibregl-ctrl-geolocate-background-error):not(:disabled) .maplibregl-ctrl-icon { background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%230b6f6a' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E"); }
 
-.pop { max-width: 290px; }
+body.fichaAbierta .maplibregl-ctrl-bottom-right { visibility: hidden; }
+.pop { max-width: 290px; max-height: 50vh; max-height: 50dvh; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
 .pop .legal { margin-top: 8px; font-size: 11px; line-height: 1.35; color: var(--muted); }
 .pop .acc { display: flex; gap: 6px; margin-top: 8px; }
 .pop .copiar { height: 28px; padding: 0 11px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel-2); font: 600 12px/1 var(--font); color: var(--accent); cursor: pointer; }
@@ -238,7 +239,7 @@ html, body { touch-action: manipulation; }
 .pop .vt { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); }
 .pop .vt h4 { margin: 0 0 6px; font-size: 13px; }
 .pop .vt h4 b { color: var(--vt-3); }
-.pop .vt ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 190px; overflow-y: auto; font-size: 12px; }
+.pop .vt ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 12px; }
 .pop .vt li { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .pop .vt li small { color: var(--muted); }
 .pop .vt .dir { color: var(--muted); font-size: 11.5px; margin: 6px 0 2px; font-weight: 600; }
@@ -502,6 +503,29 @@ html, body { touch-action: manipulation; }
   }
   // vut.txt: una línea por vivienda turística inscrita →
   // ref. catastral del edificio|lon|lat|nº registro|fecha inscripción|planta|puerta|bloque/portal|dirección|CP|plazas|modalidad (c completa, h por habitaciones)
+  // Si la ficha se sale de la pantalla o la tapan los botones del mapa, mueve el mapa para que quepa entera.
+  // En el móvil no caben ficha y botones a la vez: los botones se ocultan mientras la ficha está abierta.
+  function encajar() {
+    var p0 = popup; if (!p0) return;
+    var movil = innerWidth < 700;
+    document.body.classList.toggle('fichaAbierta', movil);
+    p0.once('close', function () { if (popup === p0 || !popup || !popup.isOpen()) document.body.classList.remove('fichaAbierta'); });
+    requestAnimationFrame(function () {
+      if (popup !== p0) return; var el = p0.getElement(); if (!el) return;
+      var r = el.getBoundingClientRect(), m = map.getContainer().getBoundingClientRect();
+      var abajo = m.bottom - (movil ? 110 : 24), arriba = m.top + 12, dy = 0, dx = 0;
+      if (r.bottom > abajo) dy = r.bottom - abajo;
+      if (r.top - dy < arriba) dy = r.top - arriba;
+      if (!movil) {
+        var c = document.querySelector('.maplibregl-ctrl-bottom-right'), pn = $('panel');
+        var der = c ? c.getBoundingClientRect().left - 12 : m.right - 12;
+        var izq = pn && pn.offsetParent ? pn.getBoundingClientRect().right + 12 : m.left + 12;
+        if (r.right > der) dx = r.right - der;
+        if (r.left - dx < izq) dx = Math.min(dx, r.left - izq);
+      }
+      if (Math.abs(dy) > 1 || Math.abs(dx) > 1) map.panBy([dx, dy], { duration: 300 });
+    });
+  }
   function leerVut(txt) {
     txt.split('\n').forEach(function (l) {
       var p = l.split('|'); if (p.length < 12) return;
@@ -709,7 +733,7 @@ html, body { touch-action: manipulation; }
     if (i != null) return abrirFicha(i, lngLat);
     var html = '<div class="pop" style="--c:var(--al)"><span class="uso">Alojamiento turístico</span>' + listaAloj(k).replace('class="al"', 'class="al" style="border:0;margin:0;padding:0"') + acciones('reg=' + ((AB[k] || [])[0] || {}).reg) + '</div>';
     if (popup) popup.remove();
-    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map);
+    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map); encajar();
   }
   function botonVer(g, ver) { g.querySelector('[data-on="1"]').setAttribute('aria-pressed', ver); g.querySelector('[data-on="0"]').setAttribute('aria-pressed', !ver); }
   // Al volver a activar una sección se activa todo lo suyo: todos los años y, en hoteles, todos los tipos.
@@ -979,7 +1003,7 @@ html, body { touch-action: manipulation; }
   function abrirVut(rc, lngLat) {
     var html = '<div class="pop" style="--c:var(--vt-3)"><span class="uso">Vivienda turística</span>' + listaVut(rc, false).replace('class="vt"', 'class="vt" style="border:0;margin:0"') + AVISO + acciones('reg=VUT/MA/' + ((VB[rc] || [])[0] || {}).reg) + '</div>';
     if (popup) popup.remove();
-    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map);
+    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map); encajar();
   }
   function portalesDe(rc) {
     var ks = (P.porRc && P.porRc[rc]) || [];
@@ -992,7 +1016,7 @@ html, body { touch-action: manipulation; }
     var html = '<div class="pop" style="--c:' + (n ? css('--vt-3') : hayAl ? css('--al') : css('--muted')) + '"><span class="uso">' + (n ? (hayAl ? 'Viviendas turísticas y hotel, hostal o similar' : 'Con viviendas turísticas') : hayAl ? 'Hotel, hostal o similar' : ANIO ? 'Ninguna inscrita en ' + ANIO : 'Sin viviendas turísticas inscritas') + '</span>' +
       '<div class="dirs">' + esc(dir) + '</div>' + listaVut(rc, !hayAl).replace('class="vt"', 'class="vt" style="border:0;padding-top:0"') + listaAloj(rc) + AVISO + '</div>';
     if (popup) popup.remove();
-    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map);
+    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map); encajar();
   }
   function abrirFicha(i, lngLat) {
     var ref = E.r[i];
@@ -1003,7 +1027,7 @@ html, body { touch-action: manipulation; }
       '<div class="note">' + (E.u[i] === 'p' ? 'El Catastro aún no tiene dibujado este edificio: se muestra la forma de su parcela' : 'Según el Catastro: uso ' + USO[E.u[i]].nombre.toLowerCase() + (E.v[i] ? ', ' + fmt.format(E.v[i]) + (E.v[i] === 1 ? ' vivienda' : ' viviendas') : ', sin viviendas') +
       (E.u[i] !== 'r' && E.v[i] ? '. La parcela mezcla viviendas y otros usos.' : '')) + '<br>Ref. catastral ' + esc(ref) + ' · <a href="' + sede + '" target="_blank" rel="noopener">Ver en la Sede del Catastro</a></div>' + AVISO + acciones('rc=' + ref) + '</div>';
     if (popup) popup.remove();
-    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map);
+    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map); encajar();
   }
 
 })();
