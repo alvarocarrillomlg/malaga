@@ -212,8 +212,7 @@ html, body { touch-action: manipulation; }
 /* Icono de «Mi ubicación» en el verde del panel (mientras no está siguiendo al usuario) */
 .maplibregl-ctrl-geolocate:not(.maplibregl-ctrl-geolocate-active):not(.maplibregl-ctrl-geolocate-background):not(.maplibregl-ctrl-geolocate-active-error):not(.maplibregl-ctrl-geolocate-background-error):not(:disabled) .maplibregl-ctrl-icon { background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='29' height='29' fill='%230b6f6a' viewBox='0 0 20 20'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1m0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E"); }
 
-body.fichaAbierta .maplibregl-ctrl-bottom-right { visibility: hidden; }
-.pop { max-width: 290px; max-height: 50vh; max-height: 50dvh; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+.pop { max-width: 290px; max-height: 50vh; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
 .pop .legal { margin-top: 8px; font-size: 11px; line-height: 1.35; color: var(--muted); }
 .pop .acc { display: flex; gap: 6px; margin-top: 8px; }
 .pop .copiar { height: 28px; padding: 0 11px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel-2); font: 600 12px/1 var(--font); color: var(--accent); cursor: pointer; }
@@ -503,26 +502,38 @@ body.fichaAbierta .maplibregl-ctrl-bottom-right { visibility: hidden; }
   }
   // vut.txt: una línea por vivienda turística inscrita →
   // ref. catastral del edificio|lon|lat|nº registro|fecha inscripción|planta|puerta|bloque/portal|dirección|CP|plazas|modalidad (c completa, h por habitaciones)
-  // Si la ficha se sale de la pantalla o la tapan los botones del mapa, mueve el mapa para que quepa entera.
-  // En el móvil no caben ficha y botones a la vez: los botones se ocultan mientras la ficha está abierta.
+  // La ficha se coloca en el hueco libre del mapa: sin tapar el panel (desplegable) ni los botones 2D/Satélite/Dibujar zona/Mi ubicación/zoom.
+  // Se ajusta su altura máxima a ese hueco y se mueve el mapa para que quepa entera.
+  function opcPop() { return { maxWidth: '310px', focusAfterOpen: false, anchor: 'top' }; }
+  function huecoLibre() {
+    var m = map.getContainer().getBoundingClientRect(), movil = matchMedia('(max-width: 720px)').matches;
+    var c = document.querySelector('.maplibregl-ctrl-bottom-right'), cr = c && c.getBoundingClientRect();
+    var pn = $('panel'), pr = pn && pn.offsetParent ? pn.getBoundingClientRect() : null;
+    var ab = document.getElementById('abrir'), arb = ab && ab.offsetParent ? ab.getBoundingClientRect() : null;
+    var h = { top: m.top + 10, bottom: m.bottom - 26, left: m.left + 8, right: m.right - 8 };
+    if (movil) {
+      if (cr) h.top = Math.max(h.top, cr.bottom + 8);              // debajo de los botones
+      var tope = [pr && pr.top, arb && arb.top].filter(function (v) { return v; });
+      if (tope.length) h.bottom = Math.min(h.bottom, Math.min.apply(null, tope) - 8);   // encima del desplegable
+    } else {
+      if (pr) h.left = Math.max(h.left, pr.right + 12);            // a la derecha del panel
+      if (arb) h.left = Math.max(h.left, arb.right + 12);
+      if (cr) h.right = Math.min(h.right, cr.left - 12);           // a la izquierda de los botones
+    }
+    return h;
+  }
   function encajar() {
     var p0 = popup; if (!p0) return;
-    var movil = innerWidth < 700;
-    document.body.classList.toggle('fichaAbierta', movil);
-    p0.once('close', function () { if (popup === p0 || !popup || !popup.isOpen()) document.body.classList.remove('fichaAbierta'); });
+    var el = p0.getElement(), pop = el && el.querySelector('.pop'); if (!pop) return;
+    var h = huecoLibre();
+    pop.style.maxHeight = Math.max(120, h.bottom - h.top - 50) + 'px';
     requestAnimationFrame(function () {
-      if (popup !== p0) return; var el = p0.getElement(); if (!el) return;
-      var r = el.getBoundingClientRect(), m = map.getContainer().getBoundingClientRect();
-      var abajo = m.bottom - (movil ? 110 : 24), arriba = m.top + 12, dy = 0, dx = 0;
-      if (r.bottom > abajo) dy = r.bottom - abajo;
-      if (r.top - dy < arriba) dy = r.top - arriba;
-      if (!movil) {
-        var c = document.querySelector('.maplibregl-ctrl-bottom-right'), pn = $('panel');
-        var der = c ? c.getBoundingClientRect().left - 12 : m.right - 12;
-        var izq = pn && pn.offsetParent ? pn.getBoundingClientRect().right + 12 : m.left + 12;
-        if (r.right > der) dx = r.right - der;
-        if (r.left - dx < izq) dx = Math.min(dx, r.left - izq);
-      }
+      if (popup !== p0) return;
+      var r = el.getBoundingClientRect(), dy = 0, dx = 0;
+      if (r.bottom > h.bottom) dy = r.bottom - h.bottom;
+      if (r.top - dy < h.top) dy = r.top - h.top;
+      if (r.right > h.right) dx = r.right - h.right;
+      if (r.left - dx < h.left) dx = r.left - h.left;
       if (Math.abs(dy) > 1 || Math.abs(dx) > 1) map.panBy([dx, dy], { duration: 300 });
     });
   }
@@ -733,7 +744,7 @@ body.fichaAbierta .maplibregl-ctrl-bottom-right { visibility: hidden; }
     if (i != null) return abrirFicha(i, lngLat);
     var html = '<div class="pop" style="--c:var(--al)"><span class="uso">Alojamiento turístico</span>' + listaAloj(k).replace('class="al"', 'class="al" style="border:0;margin:0;padding:0"') + acciones('reg=' + ((AB[k] || [])[0] || {}).reg) + '</div>';
     if (popup) popup.remove();
-    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map); encajar();
+    popup = new maplibregl.Popup(opcPop()).setLngLat(lngLat).setHTML(html).addTo(map); encajar();
   }
   function botonVer(g, ver) { g.querySelector('[data-on="1"]').setAttribute('aria-pressed', ver); g.querySelector('[data-on="0"]').setAttribute('aria-pressed', !ver); }
   // Al volver a activar una sección se activa todo lo suyo: todos los años y, en hoteles, todos los tipos.
@@ -1003,7 +1014,7 @@ body.fichaAbierta .maplibregl-ctrl-bottom-right { visibility: hidden; }
   function abrirVut(rc, lngLat) {
     var html = '<div class="pop" style="--c:var(--vt-3)"><span class="uso">Vivienda turística</span>' + listaVut(rc, false).replace('class="vt"', 'class="vt" style="border:0;margin:0"') + AVISO + acciones('reg=VUT/MA/' + ((VB[rc] || [])[0] || {}).reg) + '</div>';
     if (popup) popup.remove();
-    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map); encajar();
+    popup = new maplibregl.Popup(opcPop()).setLngLat(lngLat).setHTML(html).addTo(map); encajar();
   }
   function portalesDe(rc) {
     var ks = (P.porRc && P.porRc[rc]) || [];
@@ -1016,7 +1027,7 @@ body.fichaAbierta .maplibregl-ctrl-bottom-right { visibility: hidden; }
     var html = '<div class="pop" style="--c:' + (n ? css('--vt-3') : hayAl ? css('--al') : css('--muted')) + '"><span class="uso">' + (n ? (hayAl ? 'Viviendas turísticas y hotel, hostal o similar' : 'Con viviendas turísticas') : hayAl ? 'Hotel, hostal o similar' : ANIO ? 'Ninguna inscrita en ' + ANIO : 'Sin viviendas turísticas inscritas') + '</span>' +
       '<div class="dirs">' + esc(dir) + '</div>' + listaVut(rc, !hayAl).replace('class="vt"', 'class="vt" style="border:0;padding-top:0"') + listaAloj(rc) + AVISO + '</div>';
     if (popup) popup.remove();
-    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map); encajar();
+    popup = new maplibregl.Popup(opcPop()).setLngLat(lngLat).setHTML(html).addTo(map); encajar();
   }
   function abrirFicha(i, lngLat) {
     var ref = E.r[i];
@@ -1027,7 +1038,7 @@ body.fichaAbierta .maplibregl-ctrl-bottom-right { visibility: hidden; }
       '<div class="note">' + (E.u[i] === 'p' ? 'El Catastro aún no tiene dibujado este edificio: se muestra la forma de su parcela' : 'Según el Catastro: uso ' + USO[E.u[i]].nombre.toLowerCase() + (E.v[i] ? ', ' + fmt.format(E.v[i]) + (E.v[i] === 1 ? ' vivienda' : ' viviendas') : ', sin viviendas') +
       (E.u[i] !== 'r' && E.v[i] ? '. La parcela mezcla viviendas y otros usos.' : '')) + '<br>Ref. catastral ' + esc(ref) + ' · <a href="' + sede + '" target="_blank" rel="noopener">Ver en la Sede del Catastro</a></div>' + AVISO + acciones('rc=' + ref) + '</div>';
     if (popup) popup.remove();
-    popup = new maplibregl.Popup({ maxWidth: '310px', focusAfterOpen: false }).setLngLat(lngLat).setHTML(html).addTo(map); encajar();
+    popup = new maplibregl.Popup(opcPop()).setLngLat(lngLat).setHTML(html).addTo(map); encajar();
   }
 
 })();
